@@ -1,0 +1,59 @@
+<h1 id="contitle">Sommaire</h1>
+<div id="contents">
+    <p class="part"><a href="intro.html">Introduction</a></p>
+    <ul>
+        <li><a href="intro.html#choices">Choix techniques</a></li>
+        <li><a href="intro.html#conventions">Conventions</a></li>
+        <li><a href="intro.html#uefi">Compatibilité UEFI</a></li>
+        <li><a href="intro.html#sources">Sources et licence</a></li>
+    </ul>
+    <p class="part">Installation de Debian &nbsp; [ <a href="bios_install.html">BIOS</a> || <a href="uefi_install.html">UEFI</a> ]</p>
+    <ul>
+        <li>Étape 0 : Installation automatique &nbsp; [ <a href="bios_install.html#autoinstall">BIOS</a> || <a href="uefi_install.html#autoinstall">UEFI</a> ]</li>
+        <li>Étape 1 : Connexion au mode Rescue &nbsp; [ <a href="bios_install.html#rescue">BIOS</a> || <a href="uefi_install.html#rescue">UEFI</a> ]</li>
+        <li>Étape 2 : Partitionnement du disque &nbsp; [ <a href="bios_install.html#partitioning">BIOS</a> || <a href="uefi_install.html#partitioning">UEFI</a> ]</li>
+        <li>Étape 3 : Installation de Debian avec debootstrap &nbsp; [ <a href="bios_install.html#debootstrap">BIOS</a> || <a href="uefi_install.html#debootstrap">UEFI</a> ]</li>
+        <li>Étape 4 : Chroot &nbsp; [ <a href="bios_install.html#chroot">BIOS</a> || <a href="uefi_install.html#chroot">UEFI</a> ]</li>
+        <li>Étape 5 : Configuration des dépôts &nbsp; [ <a href="bios_install.html#apt">BIOS</a> || <a href="uefi_install.html#apt">UEFI</a> ]</li>
+        <li>Étape 6 : Paramètres régionaux et éditeur de texte &nbsp; [ <a href="bios_install.html#locale">BIOS</a> || <a href="uefi_install.html#locale">UEFI</a> ]</li>
+        <li>Étape 7 : Édition du fichier fstab &nbsp; [ <a href="bios_install.html#fstab">BIOS</a> || <a href="uefi_install.html#fstab">UEFI</a> ]</li>
+        <li>Étape 8 : Installation du système d'initialisation : Systemd &nbsp; [ <a href="bios_install.html#init">BIOS</a> || <a href="uefi_install.html#init">UEFI</a> ]</li>
+        <li>Étape 9 : Configuration du réseau &nbsp; [ <a href="bios_install.html#network">BIOS</a> || <a href="uefi_install.html#network">UEFI</a> ]</li>
+        <li>Étape 10 : Installation du noyau et du chargeur d'amorçage &nbsp; [ <a href="bios_install.html#kernel">BIOS</a> || <a href="uefi_install.html#kernel">UEFI</a> ]</li>
+        <li>Étape 11 : Installation de SSH &nbsp; [ <a href="bios_install.html#ssh">BIOS</a> || <a href="uefi_install.html#ssh">UEFI</a> ]</li>
+        <li>Étape 12 : Nettoyage et redémarrage &nbsp; [ <a href="bios_install.html#cleanup">BIOS</a> || <a href="uefi_install.html#cleanup">UEFI</a> ]</li>
+        <li>Appendice &nbsp; [ <a href="bios_install.html#appendix">BIOS</a> || <a href="uefi_install.html#appendix">UEFI</a> ]</li>
+        <li class="subsection">Connaître son serveur &nbsp; [ <a href="bios_install.html#hardware">BIOS</a> || <a href="uefi_install.html#hardware">UEFI</a> ]</li>
+        <li class="subsection">Tester la performance de son serveur &nbsp; [ <a href="bios_install.html#benchmark">BIOS</a> || <a href="uefi_install.html#benchmark">UEFI</a> ]</li>
+        <li class="subsection">Tester le processeur (CPU) &nbsp; [ <a href="bios_install.html#cpubench">BIOS</a> || <a href="uefi_install.html#cpubench">UEFI</a> ]</li>
+        <li class="subsection">Tester la mémoire vive (RAM) &nbsp; [ <a href="bios_install.html#rambench">BIOS</a> || <a href="uefi_install.html#rambench">UEFI</a> ]</li>
+        <li class="subsection">Tester le disque (HDD ou SSD) &nbsp; [ <a href="bios_install.html#hddbench">BIOS</a> || <a href="uefi_install.html#hddbench">UEFI</a> ]</li>
+        <li class="subsection">Tester la connection internet &nbsp; [ <a href="bios_install.html#netbench">BIOS</a> || <a href="uefi_install.html#netbench">UEFI</a> ]</li>
+        <li class="subsection">Tester la performance du chiffrement &nbsp; [ <a href="bios_install.html#cryptobench">BIOS</a> || <a href="uefi_install.html#cryptobench">UEFI</a> ]</li>
+    </ul>
+    <p class="part"><a href="sys_config.html">Configuration des outils de base de Debian</a></p>
+    <ul>
+        <li><a href="sys_config.html#hardening">Étape 1 (<abbr title="facultative">fac</abbr>) : Durcissement du noyau</a></li>
+        <li><a href="sys_config.html#update">Étape 2 : Configuration de mises à jour</a></li>
+        <li><a href="sys_config.html#timesync">Étape 3 : Synchronisation de l'heure</a></li>
+        <li><a href="sys_config.html#usersudo">Étape 4 : Gestion de l'utilisateur administrateur et de sudo</a></li>
+        <li><a href="sys_config.html#sshkey">Étape 5 : Gestion des clefs SSH</a></li>
+        <li><a href="sys_config.html#sshconfig">Étape 6 : Configuration et sécurisation de la connection SSH</a></li>
+        <li><a href="sys_config.html#sshopt">Étape 7 (<abbr title="facultative">fac</abbr>) : Connection SSH par double authentification</a></li>
+        <li><a href="sys_config.html#firewall">Étape 8 : Configuration du pare-feu</a></li>
+        <li><a href="sys_config.html#encryption">Étape 9 : Chiffrement de la partition de stockage</a></li>
+        <li><a href="sys_config.html#sshfs">Étape 10 : Configuration SshFS</a></li>
+        <li><a href="sys_config.html#quota">Étape 11 (<abbr title="facultative">fac</abbr>) : Quotas de disques</a></li>
+        <li><a href="sys_config.html#apparmor">Étape 12 (<abbr title="facultative">fac</abbr>) : Apparmor</a></li>
+        <li><a href="sys_config.html#dns">Étape 13 (<abbr title="facultative">fac</abbr>) : Résolution DNS</a></li>
+        <li><a href="sys_config.html#backup">Étape 14 (<abbr title="facultative">fac</abbr>) : Sauvegarde de données</a></li>
+    </ul>
+    <p class="part"><a href="web-server.html">Configuration du serveur web</a></p>
+    <ul>
+        <li><a href="web-server.html#apache">Étape 1 : Apache</a></li>
+        <li><a href="web-server.html#certificate">Étape 2 : Certificats Let's encrypt</a></li>
+        <li><a href="web-server.html#php">Étape 3 : PHP</a></li>
+        <li><a href="web-server.html#sql">Étape 4 : MariaDB</a></li>
+    </ul>
+    <p class="part">Journalisation (à venir)</p>
+</div>

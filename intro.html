@@ -1,0 +1,68 @@
+
+<h1>Introduction</h1>
+
+<p>
+    Le but de ce document est de décrire de manière complète et détaillée l'installation et la configuration du système d'exploitation Debian (basé sur le noyau Linux) pour son utilisation sur un serveur.<br>
+    Dans cet exemple de configuration, le serveur aura deux fonctions principales : celle d'un serveur web (Apache/PHP/MariaDB) permettant la diffusion d'un ou de plusieurs sites web et celle d'un serveur de stockage, totalement isolé de la partie web, qui pourra, par exemple, être utilisé pour la sauvegarde régulière de données personnelles d'un ou de plusieurs utilisateurs via SSH.<br>
+    Une attention particulière sera consacrée à la sécurité. Ce document essayera au maximum de respecter les <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">recommandations de sécurité relatives à un système GNU/Linux</a> préconisées par l'ANSSI. On fera référence à ce document avec le sigle [ANSSI]. Les principes de bases appliqués ici seront le principe de moindre privilège dont l'objectif est de cloisonner au maximum les différentes fonctionnalités du serveur (si une des fonctionnalités venait à tomber à cause d'un bug ou d'un piratage, les autres seront préservées) et le principe de minimisation de la surface d'attaque en essayant d'avoir le système le plus léger possible notamment en supprimant ou désactivant toutes les fonctionnalités non utilisées (réduire la quantité de code en cours d'exécution permet de réduire le nombre de bug et de failles potentielles). Pour plus de détails sur ces principes généraux de sécurité voir <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">[ANSSI p.8-9]</a>.
+</p>
+
+<h2 id="choices">Choix techniques</h2>
+
+<p>
+    Les logiciels utilisés seront :
+</p>
+<ul>
+    <li>Système d'exploitation : Debian 12</li>
+    <li>Serveur Web : Apache 2.4.57 / PHP 8.2 / MariaDB 1.22</li>
+    <li>SSL : Let's encrypt via uacme</li>
+    <li>Pare-feu : nftables</li>
+    <li>Partage et transfert de fichiers : SshFS</li>
+</ul>
+
+<p>
+    Ce document est valable aussi bien pour des serveurs dédiés que des VPS. Les hébergeurs français proposant des serveurs dédiés ou VPS sont par exemple OVH, Kimsufi, So You Start, Scaleway, PulseHeberg.
+</p>
+
+<p>
+	Dans ce document on répondra aux questions suivantes :
+</p>
+<ul>
+  <li>Comment installer un Debian très minimal avec debootstrap ? Réponse <a href="uefi_install.html#debootstrap">ici</a></li>
+  <li>Comment partitionner un disque en GPT avec gdisk ? Réponse <a href="uefi_install.html#partitioning">ici</a></li>
+  <li>Comment faire un benchmark de son serveur ? Réponse <a href="uefi_install.html#benchmark">ici</a></li>
+  <li>Comment durcir le noyau Linux ? Réponse <a href="sys_config.html#hardening">ici</a></li>
+  <li>Comment utiliser la double authentification pour SSH ? Réponse <a href="sys_config.html#sshopt">ici</a></li>
+  <li>Comment faire du Port-knocking avec nftables ? Réponse <a href="sys_config.html#firewall">ici</a></li>
+  <li>Comment chiffrer un disque avec cryptsetup ? Réponse <a href="sys_config.html#encryption">ici</a></li>
+  <li>Comment générer et utiliser un certificat let's encrypt avec le chiffrement ECDSA ? Réponse <a href="web-server.html#certificate">ici</a></li>
+  <li>Quels sont les différents mode d'exécution de PHP sur un serveur Apache ? Réponse <a href="web-server.html#php">ici</a></li>
+</ul>
+
+<h2 id="conventions">Conventions</h2>
+
+<p>Dans toute la suite on supposera que l'adresse IP de notre serveur sera <code>10.11.12.13</code>. Il faudra évidemment remplacer cette adresse par l'adresse de votre serveur. Nous faisons le choix de ne pas utiliser et de désactiver l'IPv6.<br>
+On suppose que le nom d'utilisateur de l'administrateur du serveur sera <code>alice</code>.</p>
+
+<h2 id="uefi">Compatibilité UEFI</h2>
+
+<p>
+  Il faut tout d'abord déterminer si votre serveur est compatible ou non avec le standard <a href="https://fr.wikipedia.org/wiki/UEFI">UEFI</a>.<br>
+  La procédure d'installation changera un peu sur un système <code>BIOS</code> et <code>UEFI</code>.<br>
+  Pour tester si votre système supporte <code>UEFI</code> il suffit d'installer et de lancer le programme <code>efibootmgr</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="server"><code class="language-bash">apt install efibootmgr
+efibootmgr</code></pre>
+
+<p>
+  Si votre système supporte <code>UEFI</code> vous pouvez vous référer à l'<a href="uefi_install.html">installation compatible UEFI</a>.<br>
+  Sinon il faudra partir sur l'<a href="bios_install.html">installation compatible BIOS</a>.
+</p>
+
+<h2 id="sources">Sources et licence</h2>
+
+<p>
+  Ce document est sous licence <a href="https://creativecommons.org/licenses/by-nc/4.0/">Creative Commons CC BY-NC 4.0</a>.<br>
+  Les sources sont disponibles sur <a href="https://github.com/Mezalor/DebianServer">GitHub</a>.
+</p>
