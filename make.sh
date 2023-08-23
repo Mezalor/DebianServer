@@ -6,6 +6,7 @@ mkdir -p docs
 cp bootstrap.min.css clean-blog.min.css debian.avif fav.png github.png prism.css prism.js style.css docs/
 
 cat header.html intro.html footer.html > docs/intro.html
+ln -s docs/intro.html docs/index.html
 cat header.html bios_install.html footer.html > docs/bios_install.html
 cat header.html uefi_install.html footer.html > docs/uefi_install.html
 cat header.html sys_config.html footer.html > docs/sys_config.html
