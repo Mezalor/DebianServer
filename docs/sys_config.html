@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="Description complète et détaillée de l'installation et la configuration de Debian 12 sur un serveur ou VPS web avec une attention portée à la sécurité">
+  <meta name="keywords" content="Debian, serveur, installation, configuration, sécurité, web, Bookworm">
+  <meta name="author" content="Mezalor">
+
+  <title>Installation et configuration de Debian 12 sur un serveur</title>
+
+  <link rel="icon" type="image/png" href="fav.png">
+
+  <link href="bootstrap.min.css" rel="stylesheet">
+  <link href="clean-blog.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="prism.css">
+
+  <script src="prism.js"></script>
+
+</head>
+
+<body>
+
+  <header class="masthead" style="background-image: url('debian.avif')">
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-10 mx-auto">
+          <div class="post-heading">
+            <h1>Installation et configuration de Debian 12</h1>
+            <h2 class="subheading"> sur un serveur dédié ou un VPS</h2>
+            <span class="meta">Par
+              <a href="https://github.com/Mezalor">Mezalor</a>
+              le 16 août 2023</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <article>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-12 col-md-20 mx-auto"><h1>Configuration des outils de base de Debian</h1>
+
+<p>
+  Dans cette partie nous configurerons les outils de bases du système : gestion des mise à jour, réglage de l'heure, ssh, le pare-feu, etc.
+</p>
+
+<p>
+  On commence par se connecter au serveur fraîchement installé par SSH avec l'utilisateur <code>root</code> et le mot de passe défini à l'étape 11 de la partie précédente.
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">ssh-keygen -f "/home/alice/.ssh/known_hosts" -R "10.11.12.13"
+ssh root@10.11.12.13</code></pre>
+
+
+<h2 id="hardening">Étape 1 (<abbr title="facultative">fac</abbr>) : Durcissement du noyau</h2>
+
+<p>
+  Le durcissement du noyau Linux consiste à accroître les mécanismes de protection du noyau. Cela permet à la fois d'apporter des protections ou des contre-mesures à des vulnérabilités logicielles ou matérielles potentielles de la plateforme et réduire dans le même temps la surface d’attaque du noyau, initialement très grande.<br>
+  On se basera essentiellement sur les recommendations de l'ANSSI (voir <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">[ANSSI R7-14]</a>) aussi détaillées plus simplement <a href="https://www.it-connect.fr/details-durcissement-sysctl-systeme-linux/">ici</a> et <a href="https://www.it-connect.fr/details-durcissement-sysctl-reseau-linux/">là</a>. D'autres références sont disponibles : <a href="https://obscurix.github.io/security/kernel-hardening.html">en anglais</a> et <a href="https://wonderfall.space/linux-bricoles/">en français</a>.
+</p>
+
+<p>
+  Pour modifier les paramètres du noyau, on utilisera l'outil <code>sysctl</code>. Pour que les changements apportés au noyau soit appliqués au démarrage du système il suffit de créer un fichier de configuration (avec l’extension <code>.conf</code>) dans le répertoire <code>/etc/sysctl.d</code>. Dans ces fichiers de configuration il suffira d'indiquer la clef du paramètre à changer suivie de sa valeur. Pour avoir une liste assez complète des paramètres du noyau vous pouvez aller sur ce <a href="https://sysctl-explorer.net/">site</a> et pour déterminer les paramètre actuel du noyau de votre système on peut utiliser la commande <code>sysctl -a</code>.
+</p>
+
+<p>
+  On commence par les paramètres du noyau.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/sysctl.d/10-kernel.conf</code></pre>
+
+<figure><figcaption>/etc/sysctl.d/10-kernel.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini"># Désactive les combinaisons de touches magiques (Magic System Request Key)
+kernel.sysrq = 0
+# Default : kernel.sysrq = 438
+
+# Active l'ASLR
+kernel.randomize_va_space = 2
+# Default : kernel.randomize_va_space = 2
+
+# Cache les adresses noyau dans /proc et les différentes autres interfaces,
+# y compris aux utilisateurs privilégiés
+kernel.kptr_restrict = 2
+# Default : kernel.kptr_restrict = 0
+
+# Restreint l'accès au buffer dmesg
+kernel.dmesg_restrict = 1
+# Default : kernel.dmesg_restrict = 1
+
+# Interdit l'accès non privilégié à l'appel système perf_event_open (). Avec une
+# valeur plus grande que 2, on impose la possession de CAP_SYS_ADMIN , pour pouvoir
+# recueillir les évènements perf.
+kernel.perf_event_paranoid = 3
+# Default : kernel.perf_event_paranoid = 3
+
+# Restreint l'utilisation du sous -système perf
+kernel.perf_cpu_time_max_percent = 5
+# Default : kernel.perf_cpu_time_max_percent = 25
+
+# Restreint l'usage du BPF noyau aux utilisateurs privilégiés
+kernel.unprivileged_bpf_disabled = 1
+# Default : kernel.unprivileged_bpf_disabled = 2
+
+# ptrace protections
+kernel.yama.ptrace_scope = 1
+# Default : kernel.yama.ptrace_scope = 0
+
+# Désactive kexec
+kernel.kexec_load_disabled = 1
+# Default : kernel.kexec_load_disabled = 0
+
+# Arrête complètement le système en cas de comportement inattendu du noyau Linux
+kernel.panic_on_oops = 1
+# Default : kernel.panic_on_oops = 0
+
+# Interdit le chargement des modules noyau (sauf ceux déjà chargés à ce point)
+kernel.modules_disabled = 1
+# Default : kernel.modules_disabled = 0</code></pre></figure>
+
+<p>
+  On configure ensuite le réseau.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/sysctl.d/20-network.conf</code></pre>
+
+<figure><figcaption>/etc/sysctl.d/20-network.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini"># Pas de routage entre les interfaces. Cette option est spéciale et peut
+# entrainer des modifications d'autres options. En plaçant cette option au plus
+# tôt , on s'assure que la configuration des options suivantes ne change pas.
+net.ipv4.ip_forward = 0
+# Default : net.ipv4.ip_forward = 0
+
+# Vérifie que l'adresse source des paquets reçus sur une interface donnée aurait
+# bien été contactée via cette même interface. À défaut, le paquet est ignoré.
+# Selon l'usage, la valeur 1 peut permettre d'accroître la vérification à
+# l'ensemble des interfaces, lorsque l'équipement est un routeur dont le calcul de
+# routes est dynamique. Le lecteur intéressé est renvoyé à la RFC3704 pour tout
+# complément concernant cette fonctionnalité.
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.rp_filter = 1
+# Default : net.ipv4.conf.all.rp_filter = 0
+
+# Refuse la réception de paquet ICMP redirect. Le paramétrage suggéré de cette
+# option est à considérer fortement dans le cas de routeurs qui ne doivent pas
+# dépendre d'un élément extérieur pour déterminer le calcul d'une route. Même
+# pour le cas de machines non-routeurs, ce paramétrage prémunit contre les
+# détournements de trafic avec des paquets de type ICMP redirect.
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+# Default : net.ipv6.conf.all.accept_redirects = 1
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+# Default : net.ipv4.conf.all.secure_redirects = 1
+net.ipv4.conf.all.shared_media = 0
+net.ipv4.conf.default.shared_media = 0
+# Default : net.ipv4.conf.all.shared_media = 1
+
+# Cette option ne doit être mise à 1 que dans le cas d'un routeur, car pour ces
+# équipements l'envoi de ICMP redirect est un comportement normal. Un équipement
+# terminal n'a pas de raison de recevoir un flux dont il n'est pas destinataire et
+# donc d'émettre un paquet ICMP redirect.
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+# Default : net.ipv4.conf.all.send_redirects = 1
+
+# Refuse les informations d'en-têtes de source routing fournies par le paquet
+# pour déterminer sa route.
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+# Default : net.ipv6.conf.all.accept_source_route = 0
+
+# Loguer les paquets ayant des IPs anormales
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.default.log_martians = 1
+# Default : net.ipv4.conf.all.log_martians = 0
+
+# RFC 1337
+net.ipv4.tcp_rfc1337 = 1
+# Default : net.ipv4.tcp_rfc1337 = 0
+
+# Ignorer les réponses non conformes à la RFC 1122
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+# Default : net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+# Augmenter la plage pour les ports éphémères
+net.ipv4.ip_local_port_range = 32768 65535
+# Default : net.ipv4.ip_local_port_range = 32768 60999
+
+# Utilise les SYN cookies. Cette option permet la prévention d'attaque de
+# type SYN flood.
+net.ipv4.tcp_syncookies = 1
+# Default : net.ipv4.tcp_syncookies = 1
+
+# Désactivation de l'IPv6
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+# Default : net.ipv6.conf.all.disable_ipv6 = 0
+
+# Refuse le routage de paquet dont l'adresse source ou destination est celle de la
+# boucle locale. Cela interdit l'émission de paquet ayant comme source 127/8.
+net.ipv4.conf.all.route_localnet = 0
+# Default : net.ipv4.conf.all.route_localnet = 0
+
+# Ignore les "ICMP broadcasts" pour éviter de participer aux attaques Smurf
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+# Default : net.ipv4.icmp_echo_ignore_broadcasts = 1
+
+# Atténuation de l'effet de dispersion du JIT noyau au coût d'un compromis sur
+# les performances associées.
+net.core.bpf_jit_harden = 2
+# Default : net.core.bpf_jit_harden = 0</code></pre></figure>
+
+<p>
+  On configure ensuite la mémoire virtuelle. Il ne s'agit pas ici d'augmenter la sécurité mais d'optimiser les performances de la mémoire SWAP en fonction de l'utilisation du serveur. Pour plus d'information voir ce <a href="https://lonesysadmin.net/2013/12/22/better-linux-disk-caching-performance-vm-dirty_ratio/">document</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/sysctl.d/30-memory.conf</code></pre>
+
+<figure><figcaption>/etc/sysctl.d/30-memory.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini">vm.swappiness = 15
+# Default : vm.swappiness = 60
+vm.dirty_ratio = 20
+# Default : vm.dirty_ratio = 20
+vm.dirty_background_ratio = 10
+# Default : vm.dirty_background_ratio = 10</code></pre></figure>
+
+<p>
+  On continue par les propriétés des systèmes de fichiers.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/sysctl.d/40-filesystem.conf</code></pre>
+
+<figure><figcaption>/etc/sysctl.d/40-filesystem.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini"># Désactive la création de coredump pour les exécutables setuid
+fs.suid_dumpable = 0
+# Default : fs.suid_dumpable = 0
+
+# Disponible à partir de la version 4.19 du noyau Linux , permet d'interdire
+# l'ouverture des FIFOS et des fichiers "réguliers" qui ne sont pas la propriété
+# de l'utilisateur dans les dossiers sticky en écriture pour tout le monde.
+fs.protected_fifos = 2
+# Default : fs.protected_fifos = 1
+fs.protected_regular = 2
+# Default : fs.protected_regular = 2
+
+# Restreint la création de liens symboliques à des fichiers dont l'utilisateur
+# est propriétaire. Cette option fait partie des mécanismes de prévention contre
+# les vulnérabilités de la famille Time of Check - Time of Use (Time of Check -
+# Time of Use)
+fs.protected_symlinks = 1
+# Default : fs.protected_symlinks = 1
+
+# Restreint la création de liens durs à des fichiers dont l'utilisateur est
+# propriétaire. Ce sysctl fait partie des mécanismes de prévention contre les
+# vulnérabilités Time of Check - Time of Use , mais aussi contre la possibilité de
+# conserver des accès à des fichiers obsolètes
+# fs.protected_hardinks = 1
+# Default : n'existe pas</code></pre></figure>
+
+<p>
+  On termine par diverses propriétés.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/sysctl.d/50-other.conf</code></pre>
+
+<figure><figcaption>/etc/sysctl.d/50-other.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini"># userfaultfd() est un appel système qui peut être abusé également,
+# ce paramètre le restreint à la capacité CAP_SYS_PTRACE
+vm.unprivileged_userfaultfd = 0
+# Default : vm.unprivileged_userfaultfd = 0
+
+# Cela limite le chargement des "TTY line disciplines" à la capacité CAP_SYS_MODULE
+# pour empêcher les attaquants non privilégiés de charger des "line disciplines"
+# vulnérables avec l'ioctl TIOCSETD
+dev.tty.ldisc_autoload = 0
+# Default : dev.tty.ldisc_autoload = 1</code></pre></figure>
+
+<p>
+  On peut finalement configurer les paramètres du noyau lors du démarrage en éditant le fichier de configuration <code>/etc/default/grub</code> de GRUB et en modifiant la ligne <code>GRUB_CMDLINE_LINUX_DEFAULT</code>. Cela fonction uniquement si GRUB a été installé comme chargeur d'amorçage. Pour <code>EFISTUB</code> il faudra modifier le fichier <code>/boot/efi/startup.nsh</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/default/grub</code></pre>
+
+<figure><figcaption>/etc/default/grub</figcaption>
+<pre class="line-numbers"><code class="language-ini">GRUB_DEFAULT=0
+GRUB_TIMEOUT=0
+GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet slab_nomerge=yes init_on_free=1 mce=0 spec_store_bypass_disable=seccomp spectre_v2=on pti=on"
+GRUB_CMDLINE_LINUX=""</code></pre></figure>
+
+<ul>
+  <li><code>slab_nomerge=yes</code> (<a href="https://cateee.net/lkddb/web-lkddb/SLAB_MERGE_DEFAULT.html">CONFIG_SLAB_MERGE_DEFAULT</a>) : désactive la fusion de caches slabs (allocations mémoire dynamiques) de taille identique.
+    Cette fonctionnalité permet de différentier les allocations entre les différents caches slabs, et complique fortement les méthodologies de pétrissage du tas (heap massaging) en cas de heap overflow ;</li>
+  <li><code>init_on_free=1</code> (<a href="https://cateee.net/lkddb/web-lkddb/INIT_ON_FREE_DEFAULT_ON.html">INIT_ON_FREE_DEFAULT_ON</a>) : cela permet la remise à zéro de la mémoire à la libération, ce qui peut aider à atténuer les vulnérabilités d'utilisation après libération et à effacer les informations sensibles en mémoire.
+  </li>
+  <li><code>mce=0</code> : Cela provoque une panique du noyau sur les erreurs non corrigibles dans la mémoire ECC qui pourraient être exploitées. Ceci n'est pas nécessaire pour les systèmes sans mémoire ECC.</li>
+  <li><code>spec_store_bypass_disable=seccomp</code> : force le système à utiliser la contre-mesure par défaut pour la vulnérabilité Spectre v4 (Speculative Store Bypass) ;</li>
+  <li><code>spectre_v2=on</code> : force le système à utiliser une contre-mesure pour la vulnérabilité Spectre v2 (Branch Target Injection) ;</li>
+  <li><code>pti=on</code> : force l’utilisation de Page Table Isolation (PTI) y compris sur les processeurs se prétendant non impactés par la vulnérabilité Meltdown ;</li>
+  <li><code>page_poison=on</code> (<a href="https://cateee.net/lkddb/web-lkddb/PAGE_POISONING.html">CONFIG_PAGE_POISONING</a>) : déjà activé par défaut dans Debian 12 ;</li>
+  <li><code>init_on_alloc=1</code> (<a href="https://cateee.net/lkddb/web-lkddb/INIT_ON_ALLOC_DEFAULT_ON.html">CONFIG_INIT_ON_ALLOC_DEFAULT_ON</a>) : déjà activé par défaut dans Debian 12 ;</li>
+  <li><code>page_alloc.shuffle=1</code> (<a href="https://cateee.net/lkddb/web-lkddb/SHUFFLE_PAGE_ALLOCATOR.html">CONFIG_SHUFFLE_PAGE_ALLOCATOR</a>) : déjà activé par défaut dans Debian 12 ;</li>
+  <li><code>randomize_kstack_offset=on</code> (<a href="https://cateee.net/lkddb/web-lkddb/RANDOMIZE_KSTACK_OFFSET_DEFAULT.html">CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT</a>) : déjà activé par défaut dans Debian 12 ;</li>
+  <li><code>vsyscall=none</code> (<a href="https://cateee.net/lkddb/web-lkddb/LEGACY_VSYSCALL_NONE.html">CONFIG_LEGACY_VSYSCALL_NONE</a>) : déjà activé par défaut dans Debian 12.</li>
+</ul>
+
+<p>
+  On finit en montant la partition <code>/boot</code> et en mettant à jour Grub.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">mount /boot
+update-grub
+reboot</code></pre>
+
+<h2 id="update">Étape 2 : Configuration de mises à jour</h2>
+
+<p>
+  Dans la partie précédente, on a fait le choix de monter les partitions <code>/tmp</code> et <code>/var</code> en <code>nosuid, nodev, noexec</code>. Or le gestionnaire de paquets <code>apt</code> a besoin par défaut que les fichiers écrits dans <code>/tmp</code> et <code>/var/lib/dpkg</code> soient exécutables.<br>
+  Nous allons donc d'abord configurer <code>apt</code> pour qu'il monte une partition temporaire dans <code>/mnt/aptmp</code> avant d’installer ou de mettre à jour un paquet et qu'il démonte cette partition après l'installation du paquet. On fait de même avec la partition <code>/boot</code> au cas où il y a une mise à jour du noyau.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">mkdir /mnt/aptmp
+nano /etc/apt/apt.conf.d/70debconf</code></pre>
+
+<figure><figcaption>/etc/apt/apt.conf.d/70debconf</figcaption>
+<pre class="line-numbers"><code class="language-log">DPkg::Pre-Install-Pkgs {
+  "/usr/sbin/dpkg-preconfigure --apt || true";
+  "mount -t tmpfs -o size=500m tmpfs /mnt/aptmp";
+  "mount /boot";
+};
+DPkg::Post-Invoke {
+  "umount /mnt/aptmp";
+  "umount /boot";
+};</code></pre></figure>
+
+<p>
+  Maintenant on change les répertoires qu'utilisent <code>apt</code> et <code>dpkg</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">mkdir /root/varlibdpkg
+cp -rp /var/lib/dpkg/* /root/varlibdpkg/
+nano /etc/apt/apt.conf.d/50directories</code></pre>
+
+<figure><figcaption>/etc/apt/apt.conf.d/50directories</figcaption>
+<pre class="line-numbers"><code class="language-log">APT::ExtractTemplates::TempDir "/mnt/aptmp";
+Dir::State::status "/root/varlibdpkg/status";</code></pre></figure>
+
+<p>
+  Et on finit en rajoutant <code>admindir=/root/varlibdpkg</code> au fichier <code>/etc/dpkg/dpkg.cfg</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/dpkg/dpkg.cfg</code></pre>
+
+<figure><figcaption>/etc/apt/apt.conf.d/50directories</figcaption>
+<pre class="line-numbers"><code class="language-log">no-debsig
+log /var/log/dpkg.log
+admindir=/root/varlibdpkg</code></pre></figure>
+
+<p>
+  Il est important d'avoir un serveur toujours à jour notamment pour les mise à jour de sécurité. Pour cela on peut utiliser l'outil <code>unattended-upgrades</code> dont l'utilisation est décrite <a href="https://wiki.debian.org/fr/unattended-upgrades">ici</a>. On fait le choix ici d'utiliser une solution plus minimaliste en créant un petit script qui mettra à jour le système.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /root/apt_upgrade_daily.sh</code></pre>
+
+<figure><figcaption>/root/apt_upgrade_daily.sh</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/bin/bash
+
+# On met à jour la liste des paquets
+apt-get update
+
+# On log le nombre de mises à jour
+echo "APT UPGRADE : `apt-get -s upgrade | grep upgraded,`" | systemd-cat -p info
+
+# On effectue les mises à jour
+apt-get -y upgrade
+
+# On indique au journal la nécessité de redémarrer le serveur
+if [ -f /var/run/reboot-required ]; then
+  echo "APT UPGRADE : reboot required" | systemd-cat -p warning
+fi</code></pre></figure>
+
+<p>
+  Il faut ensuite rendre ce script exécutable puis créer un timer systemd pour le lancer à intervalle régulier. Pour plus d'information sur les timers systemd voir <a href="https://wiki.archlinux.org/title/Systemd_(Fran%C3%A7ais)/Timers_(Fran%C3%A7ais)">ici</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">chmod +x /root/apt_upgrade_daily.sh
+nano /root/apt_upgrade_daily.service</code></pre>
+
+<figure><figcaption>/root/apt_upgrade_daily.service</figcaption>
+<pre class="line-numbers"><code class="language-ini">[Unit]
+Description=Daily apt upgrade
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/apt_upgrade_daily.sh
+
+[Install]
+WantedBy=multi-user.target</code></pre></figure>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /root/apt_upgrade_daily.timer</code></pre>
+
+<figure><figcaption>/root/apt_upgrade_daily.timer</figcaption>
+<pre class="line-numbers"><code class="language-ini">[Unit]
+Description=Daily apt upgrade
+
+[Timer]
+OnCalendar=*-*-* 3:00:00
+RandomizedDelaySec=3h
+Persistent=true
+
+[Install]
+WantedBy=timers.target</code></pre></figure>
+
+<p>
+  Il faut enfin activer le timer. On vérifie ensuite que tout fonctionne.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">systemctl enable /root/apt_upgrade_daily.service
+systemctl enable /root/apt_upgrade_daily.timer
+systemctl start apt_upgrade_daily.timer
+systemctl status apt_upgrade_daily.timer
+systemctl list-timers --all</code></pre>
+
+<h2 id="timesync">Étape 3 : Synchronisation de l'heure</h3>
+
+<p>
+  Avoir un serveur toujours à l'heure est important pour la sécurité. En particulier cela est essentiel pour les certificats <abbr title="Transport Layer Security">TLS</abbr>, la connexion par <abbr title="Time based One Time Password">TOTP</abbr> ou encore l’horodatage d’évènements enregistrés dans les journaux système.<br>
+  On va s'assurer que le serveur est toujours à la bonne heure en le synchronisant avec un serveur <abbr title="Network Time Protocol">NTP</abbr> (lui même relier à une horloge atomique). Pour cela on va utiliser l'outil <code>timedatectl</code> fourni par systemd. Pour plus d'information voir cette <a href="https://wiki.archlinux.org/title/Systemd-timesyncd_(Fran%C3%A7ais)">documentation</a>.<br>
+  On commence par installer le paquet <code>systemd-timesyncd</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install systemd-timesyncd</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Les NOUVEAUX paquets suivants seront installés :
+  systemd-timesyncd</code></pre>
+
+<p>
+  On définit ensuite les serveurs NTP à utiliser.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">nano /etc/systemd/timesyncd.conf</code></pre>
+
+<figure><figcaption>/etc/systemd/timesyncd.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini">[Time]
+NTP=0.fr.pool.ntp.org 1.fr.pool.ntp.org 2.fr.pool.ntp.org 3.fr.pool.ntp.org
+FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org 2.debian.pool.ntp.org 3.debian.pool.ntp.org</code></pre></figure>
+
+<p>
+  On définit ensuite la zone géographique sur laquelle on se base pour l'heure de notre serveur (c'est notamment utile pour les changements d'heure) et on active la synchronisation.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">timedatectl set-timezone Europe/Paris
+timedatectl set-ntp true</code></pre>
+
+<p>
+  On redémarre alors le service <code>systemd-timesyncd</code> pour prendre en compte les modifications et on peut vérifie que tout est bon.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">systemctl restart systemd-timesyncd
+systemctl status systemd-timesyncd
+timedatectl status
+timedatectl timesync-status</code></pre>
+
+<p>
+  La commande <code>systemctl status systemd-timesyncd</code> permet de vérifier que le service est bien lancé, la commande <code>timedatectl status</code> permet de vérifier que la synchronisation est bien active et qu'on est bien sur la bone zone géographique et <code>timedatectl timesync-status</code> permet notamment de voir à quel serveur NTP on est connecté.
+</p>
+
+
+<h2 id="usersudo">Étape 4 : Gestion de l'utilisateur administrateur et de sudo</h2>
+
+<p>
+  Gérer son serveur directement avec le compte <code>root</code> est déconseillé en terme de sécurité (voir <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">[ANSSI R33]</a>). Pour cela on va créer un utilisateur administrateur <code>aliceadmin</code> qui pourra lancer des commandes nécessitant les privilèges administrateur via <code>sudo</code>. Cela a deux avantages : devoir entrer un mot de passe pour lancer des commandes nécessitant les privilèges de <code>root</code> et toutes les commandes lancées via <code>sudo</code> sont journalisées.
+</p>
+
+<p>
+  On commence par créer le nouvel utilisateur <code>aliceadmin</code>. On peut, sans trop de soucis, choisir un mot de passe assez facile à retenir. En effet on n'utilisera pas ce mot de passe pour se connecter au compte <code>aliceadmin</code> car on utilisera une clef ssh. On peut laisser vide les champs d'information (Name, Phone, ...).
+</p>
+
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">adduser aliceadmin</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Adding user `aliceadmin' ...
+Adding new group `aliceadmin' (1000) ...
+Adding new user `aliceadmin' (1000) with group `aliceadmin (1000)' ...
+Creating home directory `/home/aliceadmin' ...
+Copying files from `/etc/skel' ...
+Nouveau mot de passe :
+Retapez le nouveau mot de passe :
+passwd : mot de passe mis à jour avec succès
+Modifier les informations associées à un utilisateur pour aliceadmin
+Entrer la nouvelle valeur, ou appuyer sur ENTER pour la valeur par défaut
+  NOM []:
+  Numéro de chambre []:
+  Téléphone professionnel []:
+  Téléphone personnel []:
+  Autre []:
+Is the information correct? [Y/n] Y
+Adding new user `aliceadmin' to supplemental / extra groups `users' ...
+Adding user `aliceadmin' to group `users' ...</code></pre>
+
+<p>
+  On installe ensuite <code>sudo</code> que l'on configure avec la commande <code>visudo</code>. Il faut rajouter dans le fichier la ligne <code>aliceadmin ALL=(ALL) ALL</code> pour autoriser l'utilisateur <code>aliceadmin</code> à acceder à toutes les commandes root. Pour plus d'informations voir <a href="https://wiki.archlinux.org/title/Sudo_(Fran%C3%A7ais)">ici</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">apt install sudo
+visudo</code></pre>
+
+<figure><figcaption>/etc/sudoers.tmp</figcaption>
+<pre class="line-numbers"><code class="language-log">Defaults        env_reset
+Defaults        mail_badpass
+Defaults        secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+Defaults        use_pty
+
+# User privilege specification
+root    ALL=(ALL:ALL) ALL
+aliceadmin ALL=(ALL:ALL) ALL
+
+# Allow members of group sudo to execute any command
+%sudo   ALL=(ALL:ALL) ALL
+
+@includedir /etc/sudoers.d</code></pre></figure>
+
+<p>
+  On passe sur le compte de <code>aliceadmin</code> et on verrouiller le mot de passe du compte root afin qu'on ne puisse plus s'y connecter directement.
+</p>
+
+<pre class="command-line" data-user="root" data-host="webalice"><code class="language-bash">su aliceadmin</code></pre>
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo usermod -L -e 1 root
+sudo usermod -s /bin/false root</code></pre>
+
+
+<h2 id="sshkey">Étape 5 : Gestion des clefs SSH</h2>
+
+<p>
+  Le but de cette partie est de mettre en place l'authentification SSH par clef. Cela a pour avantage de diminuer drastiquement le risque de piratage par force brute car la longueur des clefs est par défaut très longue.
+</p>
+
+<p>
+  On commence par supprimer toutes les clefs du serveur, générées lors de l'installation de <code>openssh-server</code>, pour régénérer une clef RSA 4096 et une clef ED25519 avec l'outil <code>ssh-keygen</code>. Voir le <a href="https://man.openbsd.org/ssh-keygen">manuel</a>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo rm /etc/ssh/ssh_host_*
+sudo ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+sudo ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""</code></pre>
+
+<p>
+  Et on en profite pour supprimer les trop petits nombres premiers, de taille inférieur à 2048 bits, du fichier <code>/etc/ssh/moduli</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">awk '$5 >= 3071' /etc/ssh/moduli | sudo tee /etc/ssh/moduli.safe > /dev/null
+sudo mv /etc/ssh/moduli.safe /etc/ssh/moduli</code></pre>
+
+<p>
+  On passa ensuite sur la machine locale avec laquelle on se connectera au serveur. On fait le choix ici d'utiliser une clef pour l'algorithme <abbr title="Elliptic Curve Digital Signature Algorithm">ECDSA</abbr> sur la courbe elliptique Curve25519.
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">mkdir ~/.ssh/webalice/
+ssh-keygen -a 128 -t ed25519 -f ~/.ssh/webalice/aliceadmin-ed25519
+ssh-keygen -f "/home/alice/.ssh/known_hosts" -R "10.11.12.13"
+ssh-copy-id -i ~/.ssh/webalice/aliceadmin-ed25519.pub aliceadmin@10.11.12.13</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "/home/alice/.ssh/webalice/aliceadmin-ed25519.pub"
+The authenticity of host '10.11.12.13 (10.11.12.13)' can't be established.
+ED25519 key fingerprint is SHA256:uR+W9GKXuV/5g+1f8W6aiwW5IKuYA6tnbK/mCoId3i0.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+aliceadmin@10.11.12.13's password:
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'aliceadmin@10.11.12.13'"
+and check to make sure that only the key(s) you wanted were added.</code></pre>
+
+<p>
+  La deuxième commande permet de générer un couple de clefs (une clef publique et une clef privée) <code>ECDSA</code> sur la courbe elliptique <code>Curve25519</code>. Le paramètre <code>-a 128</code> signifie qu'on décide de chiffrer la clef privée (avec 128 tours de passe KDF) avec un mot de passe de sorte que sans ce mot de passe il soit impossible de se connecter au serveur. Cela a pour but d’empêcher quelqu'un qui déroberait le fichier de la clé privée sur notre disque puisse acceder au serveur sans le mot de passe. C'est une option facultative que l'on peut enlever.<br>
+  Après l'execution de la deuxième commande, deux fichiers <code>webaliceadmin-ed25519</code> et <code>webaliceadmin-ed25519.pub</code> ont été créés dans le répertoire <code>~/.ssh/vps/</code> : il s'agit de la clef privée (chiffrée) et de la clef publique. On envoie alors la clef publique au serveur avec la troisième commande pour qu'on puisse se connecter au compte <code>aliceadmin</code> avec la clef privée. Pour cela il faudra entrer le mot de passe de <code>aliceadmin</code> choisi lors de l'étape précédente.
+</p>
+
+<p>
+  On se connecte maintenant au serveur en utilisant la clef avec la commande suivant et en utilisant le mot de passe de la clef si on a décidé de chiffré la clef privée :
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">ssh -i ~/.ssh/webalice/aliceadmin-ed25519 aliceadmin@10.11.12.13</code></pre>
+
+<h2 id="sshconfig">Étape 6 : Configuration et sécurisation de la connection SSH</h2>
+
+<p>
+  On cherche dans cette partie et la suivante à configurer et sécuriser la connection SSH. Pour cela on va suivre les <a href="https://www.ssi.gouv.fr/guide/recommandations-pour-un-usage-securise-dopenssh/">recommandations pour un usage sécurisé d’(Open)SSH</a> de l'ANSSI et le <a href="https://infosec.mozilla.org/guidelines/openssh">guide</a> de Mozilla.
+</p>
+<p>
+  On édite le fichier de configuration du serveur SSH.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/ssh/sshd_config</code></pre>
+
+<figure><figcaption>/etc/ssh/sshd_config</figcaption>
+<pre class="line-numbers"><code class="language-bash">Port 32
+# ANSSI R26 | Default : Port 22
+
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+PermitRootLogin no
+# ANSSI R21 | Default : PermitRootLogin prohibit-password
+StrictModes yes
+# ANSSI | Default : StrictModes yes
+
+PubkeyAuthentication yes
+# Default : PubkeyAuthentication yes
+
+PasswordAuthentication no
+# Default : PasswordAuthentication yes
+
+KbdInteractiveAuthentication yes
+# Default : KbdInteractiveAuthentication yes
+
+UsePAM yes
+
+AllowAgentForwarding no
+# Default : AllowAgentForwarding yes
+AllowTcpForwarding no
+# ANSSI R27 | Default : AllowTcpForwarding yes
+AllowStreamLocalForwarding no
+# Default : AllowStreamLocalForwarding yes
+X11Forwarding no
+# ANSSI R28 | Default : X11Forwarding no
+PrintMotd no
+# Default : PrintMotd yes
+PrintLastLog yes
+# ANSSI R21 | Default : PrintLastLog yes
+PermitUserEnvironment no
+# ANSSI R26 | Default : PermitUserEnvironment no
+
+AcceptEnv LANG LC_*
+Subsystem sftp internal-sftp
+# Default : Subsystem sftp /usr/lib/openssh/sftp-server
+
+KexAlgorithms curve25519-sha256@libssh.org,curve25519-sha256,diffie-hellman-group-exchange-sha256
+# Default : KexAlgorithms sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
+HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+# Default : HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+# Default : Ciphers chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256
+# Default : MACs umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1
+
+AllowUsers aliceadmin
+# ANSSI R22</code></pre></figure>
+
+<p>
+  Pour valider les changement, on relance le service SSH. Pour vérifier que la nouvelle configuration fonctionne bien, on peut quitter la connection actuelle et essayer de se reconnecter.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl reload sshd
+exit</code></pre>
+
+<p>
+  On n'oublie pas d'indiquer qu'on se connecte maintenant au port <code>32</code>.
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">ssh -i ~/.ssh/webalice/aliceadmin-ed25519 -p 32 aliceadmin@10.11.12.13</code></pre>
+
+<h2 id="sshopt">Étape 7 (<abbr title="facultative">fac</abbr>) : Connection SSH par double authentification</h2>
+
+<p>
+  On peut améliorer la sécurité de la connection SSH au compte <code>aliceadmin</code> en ajoutant une double authentification comme cela est fait sur certain site. Il sera alors nécessaire d'avoir une application sur un deuxième appareil (souvent un smartphone) qui générera un code temporaire toutes les 30 secondes. Il faudra donner ce code en plus de la clef privée pour se connecter au serveur. Sur smartphone on pourra utiliser l'application <a href="https://github.com/beemdevelopment/Aegis">Aegis</a>.
+</p>
+
+<p>
+  On installe pour cela le module PAM <code>libpam-google-authenticator</code> qui contient le module PAM <a href="https://wiki.archlinux.org/title/Google_Authenticator">Google Authenticator</a>. Contrairement à ce qu'on pourrait croire ce logiciel n'utilise aucun "service Google" et n'envoie aucune donnée à Google. Il s'agit d'un logiciel totalement libre qui permet la double authentification par la génération d'un <a href="https://fr.wikipedia.org/wiki/Mot_de_passe_%C3%A0_usage_unique_bas%C3%A9_sur_le_temps">mot de passe à usage unique basé sur le temps</a> (TOTP).
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install libpam-google-authenticator</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Les NOUVEAUX paquets suivants seront installés :
+  libpam-google-authenticator libqrencode4</code></pre>
+
+<p>
+  On commence par créer la clef secrète permettant d'initialiser le TOPT en lançant <code>google-authenticator</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">google-authenticator</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Do you want authentication tokens to be time-based (y/n) y
+Warning: pasting the following URL into your browser exposes the OTP secret to Google:
+
+
+Your new secret key is: 3PWWW6ZKB7JL7S4IJD5FEZNSGQ
+Enter code from app (-1 to skip): 381176
+Code confirmed
+Your emergency scratch codes are:
+  41715015
+  47330205
+  15559260
+  82868672
+  86538443
+
+Do you want me to update your "/home/aliceadmin/.google_authenticator" file? (y/n) y
+
+Do you want to disallow multiple uses of the same authentication
+token? This restricts you to one login about every 30s, but it increases
+your chances to notice or even prevent man-in-the-middle attacks (y/n) y
+
+By default, a new token is generated every 30 seconds by the mobile app.
+In order to compensate for possible time-skew between the client and the server,
+we allow an extra token before and after the current time. This allows for a
+time skew of up to 30 seconds between authentication server and client. If you
+experience problems with poor time synchronization, you can increase the window
+from its default size of 3 permitted codes (one previous code, the current
+code, the next code) to 17 permitted codes (the 8 previous codes, the current
+code, and the 8 next codes). This will permit for a time skew of up to 4 minutes
+between client and server.
+Do you want to do so? (y/n) n
+
+If the computer that you are logging into isn't hardened against brute-force
+login attempts, you can enable rate-limiting for the authentication module.
+By default, this limits attackers to no more than 3 login attempts every 30s.
+Do you want to enable rate-limiting? (y/n) y</code></pre>
+
+<p>
+  On répond <code>oui</code> à la première question. Le système va alors générer une clef secrète qui vous permettra de configurer votre application OTP. Il suffit pour cela de scanner le QR code via l'application OPT. Il faut penser à stocker dans un endroit sûr les 5 codes de secours, sous peine d'être enfermé dehors si le générateur d'OTP devait faire défaut.<br>
+  On répond ensuite <code>oui</code>, <code>oui</code>, <code>non</code> et <code>oui</code> aux questions. Pour plus d'info voir le <a href="https://github.com/google/google-authenticator-libpam">github</a>.
+</p>
+
+<p>
+  Il faut ensuite configurer <a href="https://en.wikipedia.org/wiki/Linux_PAM">PAM</a> pour prendre en compte la double authentification lors de la connexion SSH.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/pam.d/sshd</code></pre>
+
+<p>
+  Il faut commenter la ligne contenant <code>@include common-auth</code> et la remplacer par <code>auth required pam_google_authenticator.so nullok</code> de sorte à avoir un début de fichier ressemblant à :
+</p>
+
+<figure><figcaption>/etc/pam.d/sshd</figcaption>
+<pre class="line-numbers"><code class="language-bash"># PAM configuration for the Secure Shell service
+
+# Standard Un*x authentication.
+#@include common-auth
+auth required pam_google_authenticator.so nullok
+
+# Disallow non-root logins when /etc/nologin exists.
+account    required     pam_nologin.so
+[...]</code></pre></figure>
+
+<p>
+  Il faut alors modifier le fichier de configuration de <code>ssh</code> pour qu'il prenne en compte la double authentification.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/ssh/sshd_config</code></pre>
+
+<p>
+  Il faut rajouter à la toute fin du fichier les lignes suivantes :
+</p>
+
+<figure><figcaption>/etc/ssh/sshd_config</figcaption>
+<pre class="line-numbers"><code class="language-bash">[...]
+Match User aliceadmin
+	AuthenticationMethods publickey,keyboard-interactive:pam</code></pre></figure>
+
+<p>
+  La double authentification est maintenant configurée. Il n'y a plus qu'à recharger le service <code>sshd</code> pour que les changements soient pris en compte. On peut alors se déconnecter avec <code>exit</code> et tenter de se reconnecter. Cette fois-ci il faudra donner le code OPT pour pouvoir acceder au serveur.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl reload sshd
+exit</code></pre>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">ssh -i ~/.ssh/webalice/aliceadmin-ed25519 -p 32 aliceadmin@10.11.12.13</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">ssh -i ~/.ssh/webalice/aliceadmin-ed25519 -p 32 aliceadmin@10.11.12.13
+Enter passphrase for key '/home/alice/.ssh/vps/serveradmin-ed25519':
+Verification code: </code></pre>
+
+<h2 id="firewall">Étape 8 : Configuration du pare-feu</h2>
+
+<p>
+  Debian 10 a introduit <code>nftables</code> un nouvel outil pour configurer le pare-feu qui remplace <code>iptables</code>. Il permet une gestion plus fine des règles de filtrage. Il permet notamment de créer nativement des "Blacklist" (pouvant remplacer fail2ban) et faire du "port-knocking" sans avoir à installer de logiciel tiers.<br>
+  Voici quelques références expliquant le fonctionnement de <code>nftables</code> : le <a href="https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes">wiki officiel</a>, le <a href="https://www.cert.ssi.gouv.fr/actualite/CERTFR-2017-ACT-030/">Bulletin d'actualité du CERT-FR</a> et le <a href="https://wiki.archlinux.org/title/Nftables">wiki de Archlinux</a>.
+</p>
+
+<p>
+  On commence par installer le paquet <code>nftables</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install nftables</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+  firewalld
+Paquets recommandés :
+  netbase
+Les NOUVEAUX paquets suivants seront installés :
+  libjansson4 libnftables1 libnftnl11 nftables</code></pre>
+
+<p>
+  Pour fonctionner <code>nftables</code> a besoin de charger des modules du noyau. Or à l'étape 1 on empêche le chargement de tels modules. Il faut donc ajouter les modules à charger dans <code>/etc/modules</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/modules</code></pre>
+
+<figure><figcaption>/etc/modules</figcaption>
+<pre class="line-numbers"><code class="language-bash"># /etc/modules: kernel modules to load at boot time.
+#
+# This file contains the names of kernel modules that should be loaded
+# at boot time, one per line. Lines beginning with "#" are ignored.
+# Parameters can be specified after the module name.
+
+nf_tables
+nft_ct
+nft_limit
+nft_log
+nf_log_syslog</code></pre></figure>
+
+<p>
+  Il faut alors redémarrer le serveur pour que nftables soit opérationnel.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo reboot</code></pre>
+
+<p>
+  On édite alors les règles de filtrage du pare-feu dans le fichier <code>/etc/nftables.conf</code>. Ici on propose un exemple simple de configuration :
+  <ul>
+    <li>On refuse par défaut tout traffic entrant et on accepte au cas par cas quelques exceptions.</li>
+    <li>On accepte les connections déjà établies.</li>
+    <li>On bannit pour 6 heures toutes les ip qui envoie plus de 1000 paquets TCP en moins d'une heure sur un port autre que 80 et 443 (http et https).</li>
+    <li>On bannit pour 30 minutes toutes les ip qui ouvrent plus de 100 connections invalides en moins d'une heure.</li>
+    <li>On bannit pour 15 minutes toutes les ip qui envoie un paquet non <code>SYN</code> lors de l'ouverture de la connection TCP.</li>
+    <li>On bannit pour 6 heures toutes les ip qui envoie plus de 1000 paquets UDP en moins d'une heure.</li>
+    <li>On limite à 10 paquets "ping" par seconde</li>
+    <li>On bannit pour 30 minutes toutes les ip utilisant un autre protocole que TCP UDP et ICMP.</li>
+    <li>On autorise les nouvelle connections sur les ports 80 et 443 (http et https).</li>
+    <li>On décide de mettre en place un "port-knocking" pour cacher le port de ssh (c'est une sécurité supplémentaire pour la connexion SSH). Le principe est simple : on ferme de base le port de ssh et on ne l'ouvre que pour une ip qui aura envoyée des paquets sur 4 ports qu'on aura choisi en amont (et arbitrairement). Pour filer la métaphore si une IP ne fait pas le bon "toc toc toc toc" alors le port de SSH ne s'ouvrira pas. Et a priori, à part nous, personne ne connaît les bon port sur lesquels "taper" car ils sont tous fermés par le pare-feu. A noter quand même que cette mesure n'est pas si forte que ça contre un adversaire pouvant écouter le réseau. En effet si l'adversaire peut écouter à l'entré du serveur il déterminera facilement, quand on se connectera, quelle est la séquence d'ouverture du port ssh. Cependant c'est une technique très efficace contre les bots qui testent tous les ports. Pour plus d'information voir <a href="https://wiki.archlinux.org/title/Port_knocking">ici</a> et pour avoir des exemples avec <code>nftables</code> voir <a href="https://wiki.nftables.org/wiki-nftables/index.php/Port_knocking_example">là</a>.</li>
+  </ul>
+  Il faut évidemment modifier le fichier suivant, notament en changer les ports du "port-knocking".
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/nftables.conf</code></pre>
+
+<figure><figcaption>/etc/nftables.conf</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+
+    # Port-Knocking : 1111:tcp,2222:udp,3333:tcp,4444:udp
+    define port1 = 1111
+    define port2 = 2222
+    define port3 = 3333
+    define port4 = 4444
+
+    # SSH Port
+    define sshport = 32
+
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Allow established/related connections
+        ct state {established, related} accept
+
+        # Allow from loopback
+        iifname lo accept
+
+        # BlackList IP
+        ip saddr @blackhole drop
+
+        # FLOODING simple blacklist
+        tcp dport != @tcpaccepted meter flood { ip saddr timeout 1h limit rate over 1000/hour } add @blackhole { ip saddr timeout 6h } log prefix "NFT_LOG : FLOOD : " drop
+
+        # Drop invalid connections
+        ct state invalid tcp dport @tcpaccepted drop
+        ct state invalid meter invalid { ip saddr timeout 1h limit rate over 100/hour } add @blackhole { ip saddr timeout 30m } log prefix "NFT_LOG : INVALID CONNECTION : " drop
+
+        # If the connection is NEW and flag is not SYN then drop
+        tcp flags != syn meter suspicious { ip saddr timeout 1h limit rate over 50/hour } add @blackhole { ip saddr timeout 15m } log prefix "NFT_LOG : NOTSYN : " drop
+
+        # UDP
+        ip protocol udp meter udpflood { ip saddr timeout 1h limit rate over 1000/hour } add @blackhole { ip saddr timeout 6h } log prefix "NFT_LOG : UDP : " drop
+
+        # ICPM with ping limitation
+        ip protocol icmp icmp type echo-request limit rate 10/second accept
+
+        # Other protocol
+        ip protocol != { tcp, udp, icmp } meter proto { ip saddr timeout 1h limit rate over 30/hour } add @blackhole { ip saddr timeout 30m } log prefix "NFT_LOG : OTHER PROTO : " drop
+
+        # Allow accepted tcp port
+        tcp dport @tcpaccepted tcp flags syn ct state new accept
+
+        # Port-Knocking to ssh
+        jump PortKnock
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+
+    # Blacklist of ip
+    set blackhole {
+        type ipv4_addr;
+        flags timeout;
+    }
+
+    # tcp and udp accepted port
+    set tcpaccepted {
+        type inet_service;
+        elements = { 80, 443 }
+    }
+
+    # Port knocking
+    set Knocked_1 {
+        type ipv4_addr
+        flags timeout
+        timeout 10s
+    }
+
+    set Knocked_2 {
+        type ipv4_addr
+        flags timeout
+        timeout 10s
+    }
+
+    set Knocked_3 {
+        type ipv4_addr
+        flags timeout
+        timeout 10s
+    }
+
+    set Knocked_accept {
+        type ipv4_addr
+        flags timeout
+        timeout 5m
+    }
+
+    chain Lock {
+        add @blackhole { ip saddr timeout 10s }
+    }
+    chain Knock_1 {
+        add @Knocked_1 { ip saddr }
+    }
+    chain Knock_2 {
+        add @Knocked_2 { ip saddr }
+    }
+    chain Knock_3 {
+        add @Knocked_3 { ip saddr }
+    }
+    chain Knock_a {
+        add @Knocked_accept { ip saddr } log prefix "NFT_LOG : Port-Knock accepted : "
+    }
+
+
+    chain PortKnock {
+
+        # Allow accepted connection by portknocking
+        ip saddr @Knocked_accept tcp dport $sshport accept
+
+        udp dport $port4 ct state new ip saddr @Knocked_3 goto Knock_a
+        tcp dport $port3 ct state new ip saddr @Knocked_3 return
+        ip saddr @Knocked_3 ct state new goto Lock
+
+        tcp dport $port3 ct state new ip saddr @Knocked_2 goto Knock_3
+        udp dport $port2 ct state new ip saddr @Knocked_2 return
+        ip saddr @Knocked_2 ct state new goto Lock
+
+        udp dport $port2 ct state new ip saddr @Knocked_1 goto Knock_2
+        tcp dport $port1 ct state new ip saddr @Knocked_1 return
+        ip saddr @Knocked_1 ct state new goto Lock
+
+        tcp dport $port1 ct state new goto Knock_1
+    }
+
+}</code></pre></figure>
+
+<p>
+  Il faut maintenant démarrer le pare-feu et vérifier qu'il fonctionne.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl start nftables
+sudo systemctl status nftables
+sudo nft list table inet filter</code></pre>
+
+<p>
+  A ce stade là, si vous avez fait des modifications et que vous n'êtes pas sûrs de vos règles, je recommande d'ouvrir un nouveau terminal et de tenter de vous connecter au serveur. [...]<br>
+  Maintenant pour se connecter à ssh il faut faire la bonne séquence de "port-knocking". On utilise alors le petit logiciel <code>knock</code> qu'il faut installer sur la machine locale utiliser comme suit :
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">sudo apt install knockd
+knock -d 100 10.11.12.13 1111:tcp 2222:udp 3333:tcp 4444:udp && ssh -i ~/.ssh/webalice/aliceadmin-ed25519 -p 32 aliceadmin@10.11.12.13</code></pre>
+
+<p>
+  A noter que maintenant sans faire <code>knock -d 100 10.11.12.13 1111:tcp 2222:udp 3333:tcp 4444:udp</code> vous ne pouvez plus acceder au serveur via SSH car le port est fermé. Le fait de faire <code>knock -d 100 10.11.12.13 1111:tcp 2222:udp 3333:tcp 4444:udp</code> permet d'ouvrir le port SSH pour une durée de 5 min pour l'IP qui fait la requête.
+</p>
+
+<p>
+  Maintenant que tout bon on peut activer par défaut le pare-feu à chaque démarrage du serveur.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl enable nftables</code></pre>
+
+<p>
+  En cas d'erreur de configuration du pare-feu il est possible que le serveur devienne inaccessible (même après redémarrage. Il faudra alors démarrer en mode rescue, modifier le fichier <code>/etc/nftables.conf</code> et redémarrer le serveur.
+</p>
+
+<p>
+  Dans la configuration proposée de nftables on journalise un certain nombre d'opération, par exemple les bannissements d'IP. Pour voir les logs de nftables on utilise
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo journalctl | grep "NFT"</code></pre>
+
+<p>
+  et on peut voir la liste des ip dans la blacklist avec la commande
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nft list table inet filter</code></pre>
+
+<h2 href="encryption">Étape 9 : Chiffrement de la partition de stockage</h2>
+
+<p>
+  Commençons rappeler l'organisation du disque du serveur.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo lsblk -f</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">NAME    FSTYPE FSVER LABEL UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+sda
+├─sda1
+├─sda2  ext4   1.0         67ffeaa3-6a24-4973-9492-d84b3ed33e98
+├─sda3  ext4   1.0         4d1f2b87-fdde-4dd0-b1e2-b79ea2b5d6e7    2,7G     0% /
+├─sda4  ext4   1.0         eaa44e06-26ea-4ced-a0b8-0e7ed13dfaa8    2,4G     9% /var
+├─sda5  ext4   1.0         0f76eb85-394f-47c2-a8db-515eba6859cd    9,2G     1% /var/log
+├─sda6  ext4   1.0         d675f6af-6b1b-46f3-b200-9cb8be4fc2ac    3,7G    14% /usr
+├─sda7  ext4   1.0         6dcb5bb2-af3e-417a-9bbf-bcf6dfd4eea0    1,9G     0% /opt
+├─sda8  ext4   1.0         1a77e46b-5838-499d-a4f5-7c95a357d594    9,6G     0% /home
+├─sda9  swap   1           4464a211-350f-460d-889f-0466468a66b6                [SWAP]
+└─sda10</code></pre>
+
+<p>
+  L'objectif de cette partie est de chiffrer la partition <code>/dev/sda10</code>. Pour cela on va utiliser le logiciel <code>cryptsetup</code> pour créer une partition <code>LUKS</code>. Pour plus d'informations voir <a href="https://wiki.archlinux.org/title/dm-crypt/Device_encryption">ici</a>. On commence par installer le logiciel.
+</p>
+
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install cryptsetup</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+  cryptsetup-initramfs dosfstools keyutils liblocale-gettext-perl
+Les NOUVEAUX paquets suivants seront installés :
+  cryptsetup cryptsetup-bin libpopt0</code></pre>
+
+<p>
+  Il faut également autoriser des modules noyau pour le bon fonctionnement de <code>cryptsetup</code>. On rajoute à la suite de <code>/etc/modules</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/modules</code></pre>
+
+<figure><figcaption>/etc/modules</figcaption>
+<pre class="line-numbers"><code class="language-bash">[...]
+algif_skcipher
+aesni_intel
+xts
+dm_crypt</code></pre></figure>
+
+<p>
+  Il faut alors redémarrer le serveur pour que nftables soit opérationnel.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo reboot</code></pre>
+
+<p>
+  On décide ici de partir sur un bon compromis sécurité/performance en choisissant de chiffrer en <code>aes-xts 256</code> ce qui équivaut en fait à un niveau de sécurité de AES en 128 bits. Pour la fonction de dérivation de clé on choisit l'algorithme Argon2id. Attention suivant la valeur du paramètre <code>--pbkdf-force-iterations</code> et la puissance du serveur cela peut prendre beaucoup de temps.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo cryptsetup --type luks2 --cipher aes-xts-plain64 --key-size 256 --hash sha512 --pbkdf argon2id --pbkdf-force-iterations 5 --pbkdf-memory 1048576 --pbkdf-parallel 4 luksFormat /dev/sda10</code></pre>
+
+<p>
+  Il faut taper <code>YES</code> puis choisir un bon mot de passe.
+</p>
+
+<p>
+  On peut vérifier les métadonnées de la partition <code>LUKS</code> et sauvegarder ces métadonnées avec les commandes
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo cryptsetup luksDump /dev/sda10
+sudo cryptsetup luksHeaderBackup /dev/sda10 --header-backup-file luks-header-server.img</code></pre>
+
+<p>
+  On récupérera plus tard le fichier <code>luks-header-server.img</code> qu'on sauvegardera localement.
+</p>
+
+<p>
+  On déchiffre la partition <code>/dev/sda10</code> puis on la formate en <code>ext4</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo cryptsetup luksOpen /dev/sda10 hdcrypt
+sudo mkfs.ext4 -m 1 /dev/mapper/hdcrypt</code></pre>
+
+<p>
+  On monte alors cette partition sur <code>/home/crypt</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir /home/crypt
+sudo mount -o rw,nosuid,nodev,noexec /dev/mapper/hdcrypt /home/crypt</code></pre>
+
+<p>
+  On peut créer le script suivant permettant d'automatiser le déchiffrement puis le montage de la partition chiffrée. Il faudra l'exécuter à chaque démarrage du serveur pour pouvoir acceder au données chiffrée. Puisqu'il faudra le mot de passe pour le déchiffrement il est inutile de lancer automatiquement ce script.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /root/decrypt.sh</code></pre>
+
+<figure><figcaption>/root/decrypt.sh</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/bin/bash
+
+cryptsetup luksOpen /dev/sda10 hdcrypt
+mount -o rw,nosuid,nodev,noexec /dev/mapper/hdcrypt /home/crypt</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo chmod +x /root/decrypt.sh</code></pre>
+
+<h2 href="sshfs">Étape 10 : Configuration SshFS</h2>
+
+<p>
+  On va dans cette partie configurer SSH afin de pouvoir monter un espace de stockage à l'aide de <code>sshfs</code>. Pour plus de détails voir <a href="https://wiki.archlinux.org/title/SSHFS_(Fran%C3%A7ais)">ici</a> et <a href="https://wiki.archlinux.org/title/SFTP_chroot">là</a>.
+</p>
+
+<p>
+  On souhaite créer des utilisateurs qui pourront acceder au serveur de stockage. Pour cela, puisqu'on a fait expirer le compte <code>root</code> on doit modifier le fichier <code>/etc/pam.d/chfn</code> pour autoriser la création du nom complet et des informations associées à l'utilisateur. Il faut ajouter la ligne <code>account         sufficient      pam_rootok.so</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/pam.d/chfn</code></pre>
+
+<figure><figcaption>/etc/pam.d/chfn</figcaption>
+<pre class="line-numbers"><code class="language-bash">#
+# The PAM configuration file for the Shadow `chfn' service
+#
+
+# This allows root to change user infomation without being
+# prompted for a password
+auth            sufficient      pam_rootok.so
+account         sufficient      pam_rootok.so
+[...]</code></pre></figure>
+
+<p>
+  On crée ensuite les utilisateurs qui pourront acceder au serveur de stockage. Disons qu'on a deux utilisateurs : <code>bob-data</code> et <code>carol-data</code>. On rajoute l'utilisatrice <code>aliceweb</code> qui gérera l'espace pour les sites web. On peut choisir un mot de passe temporaire fort qui ne sera pas utilisé pour l'accès à l'espace de stockage. Ensuite on empêche l'accès à ces compte par mot de passe.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo adduser bob-data
+sudo adduser carol-data
+sudo adduser aliceweb
+sudo usermod -L -s /usr/sbin/nologin bob-data
+sudo usermod -L -s /usr/sbin/nologin carol-data
+sudo usermod -L -s /usr/sbin/nologin aliceweb</code></pre>
+
+<p>
+  On créer un dossier pour chaque utilisateur sur la partition chiffrée et on restreint l'accès à ces dossier.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir -p /home/crypt/bob/data
+sudo chown bob-data:bob-data /home/crypt/bob/data
+sudo chmod 755 /home/crypt/bob/data
+sudo mkdir -p /home/crypt/carol/data
+sudo chown carol-data:carol-data /home/crypt/carol/data
+sudo chmod 755 /home/crypt/carol/data</code></pre>
+
+<p>
+  On créer aussi un dossier dans lequel on mettra les sites web. On gérera cet espace dans une prochaine partie mais on ne souhaite pas que ces données soient sur la partition chiffrée. En effet en cas de redémarrage du serveur on veut que les sites web soient accessibles sans avoir à déchiffrer la partition chiffrée.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir /home/www</code></pre>
+
+<p>
+  On souhaite que les utilisateurs <code>bob-data</code>, <code>carol-data</code> et <code>aliceweb</code> se connectent à SSH avec une clef mais uniquement pour acceder au documents de leur dossier respectif. On les empêche aussi d'acceder à un terminal car ils n'ont pas à lancer de commande. Pour cela on édite le fichier <code>/etc/ssh/sshd_config</code> en modifiant la ligne <code>AllowUsers aliceadmin</code> et en ajoutant à la fin du fichier les lignes suivantes de sorte à avoir
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/ssh/sshd_config</code></pre>
+
+<figure><figcaption>/etc/ssh/sshd_config</figcaption>
+<pre class="line-numbers"><code class="language-bash">[...]
+#AllowUsers aliceadmin
+AllowUsers aliceadmin aliceweb bob-data carol-data
+# ANSSI R22
+
+Match User aliceadmin
+	AuthenticationMethods publickey,keyboard-interactive:pam
+
+Match User aliceweb
+	AuthenticationMethods publickey
+	ForceCommand internal-sftp
+	ChrootDirectory /home/www
+	PermitTTY no
+
+Match User bob-data
+	AuthenticationMethods publickey
+	ForceCommand internal-sftp
+	ChrootDirectory /home/crypt/bob
+	PermitTTY no
+
+Match User carol-data
+	AuthenticationMethods publickey
+	ForceCommand internal-sftp
+	ChrootDirectory /home/crypt/carol
+	PermitTTY no</code></pre></figure>
+
+<p>
+  On créer maintenant à partir de la machine locale une clef SSH pour chaque utilisateur. On pourra entrer un mot de passe vide.
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">ssh-keygen -o -t ed25519 -f ~/.ssh/webalice/aliceweb-ed25519
+ssh-keygen -o -t ed25519 -f ~/.ssh/webalice/bob-ed25519
+ssh-keygen -o -t ed25519 -f ~/.ssh/webalice/carol-ed25519</code></pre>
+
+<p>
+  On décide ici d'installer à la main les clefs SSH sur le serveur plutôt que d'utiliser <code>ssh-copy-id</code>. Pour cela on créer dans chaque dossier personnel un dossier <code>.ssh</code> et un fichier <code>authorized_keys</code> dans lequel on mettra la clef publique précédemment générée. Par exemple pour <code>aliceweb</code> : on récupère d'abord la clef publique sur la machine locale
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">cat ~/.ssh/webalice/aliceweb-ed25519.pub</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICR4KHdnxyc8VL8Yz9j15Vl9A8yp2Nyj1o9BzoAqLku7 alice@home</code></pre>
+
+<p>
+  Ensuite sur le serveur on fait
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir /home/aliceweb/.ssh
+sudo nano /home/aliceweb/.ssh/authorized_keys</code></pre>
+
+<figure><figcaption>/home/aliceweb/.ssh/authorized_keys</figcaption>
+  <pre class="line-numbers"><code class="language-bash">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICR4KHdnxyc8VL8Yz9j15Vl9A8yp2Nyj1o9BzoAqLku7 alice@home</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo chown -R aliceweb:aliceweb /home/aliceweb/.ssh
+sudo chmod 700 /home/aliceweb/.ssh
+sudo chmod 400 /home/aliceweb/.ssh/authorized_keys</code></pre>
+
+<p>
+  Il faut ensuite faire de même pour les autres utilisateurs c'est-à-dire ici pour <code>bob-data</code> et <code>carol-data</code>.<br>
+  On peut alors relancer le service <code>sshd</code>
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl reload sshd</code></pre>
+
+<p>
+  On peut désormais se connecter à l'espace de stockage du serveur, par exemple de Bob, avec la commande
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">knock -d 100 10.11.12.13 1111:tcp 2222:udp 3333:tcp 4444:udp && sshfs bob-data@10.11.12.13:/data /home/alice/pointDeMontage -p 32 -o IdentityFile=~/.ssh/webalice/bob-ed25519</code></pre>
+
+<h2 href="quota">Étape 11 (<abbr title="facultative">fac</abbr>) : Quotas de disques</h2>
+
+<p>
+  Afin d'éviter qu'un des utilisateur utilise à lui seul tout l'espace de la partition chiffrée on va mettre en place un système de quota. Pour plus de détails voiri <a href="https://wiki.archlinux.org/title/Disk_quota">ici</a>. On commence par installer les paquets <code>quota</code> et <code>quotatool</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install quota quotatool</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+  libnet-ldap-perl rpcbind default-mta | mail-transport-agent
+Paquets recommandés :
+  libldap-common libsasl2-modules
+Les NOUVEAUX paquets suivants seront installés :
+  libldap-2.5-0 libnl-3-200 libnl-genl-3-200 libsasl2-2 libsasl2-modules-db quota quotatool</code></pre>
+
+<p>
+  Il est nécessaire d'activer le module noyau <code>quota_v2</code>. Il faut donc l'ajouter au fichier <code>/etc/modules</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/modules</code></pre>
+
+<figure><figcaption>/etc/modules</figcaption>
+<pre class="line-numbers"><code class="language-bash">[...]
+quota_v2</code></pre></figure>
+
+<p>
+  Puis on redémarre le serveur.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo reboot</code></pre>
+
+<p>
+  Il faut ensuite démonter la partition chiffrée pour
+  avec les options de montage permettant la mise en place des quotas. Pour plus d'informations voir <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/managing_file_systems/limiting-storage-space-usage-on-ext4-with-quotas_managing-file-systems">ici</a> et le <a href="https://manpages.debian.org/testing/e2fsprogs/ext4.5.en.html#quota">manuel de ext4</a>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo tune2fs -O quota /dev/mapper/hdcrypt
+sudo tune2fs -Q usrquota /dev/mapper/hdcrypt</code></pre>
+
+<p>
+  On peut également modifier le script de montage de la partition chiffrée
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /root/decrypt.sh</code></pre>
+
+<figure><figcaption>/root/decrypt.sh</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/bin/bash
+
+cryptsetup luksOpen /dev/sda10 hdcrypt
+mount -o rw,nosuid,nodev,noexec,usrquota /dev/mapper/hdcrypt /home/crypt</code></pre></figure>
+
+<p>
+  On créer le fichier de configuration des quota sur la partition chiffré et on active les quotas.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo /root/./decrypt.sh</code></pre>
+
+<p>
+  On configure maintenant les quotas par utilisateurs. Pour <code>bob</code> on lui accorde jusqu'à <code>10 Gio</code> (stricte) avec un avertissement à <code>9 Gio</code> (souple) et pour <code>carol</code> on lui accorde jusqu'à <code>20 Gio</code> (stricte) avec un avertissement à <code>15 Gio</code> (souple).
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo edquota bob-data</code></pre>
+
+<pre class="line-numbers"><code class="language-bash">Quotas disque pour user bob-data (uid 1001) :
+  Système de fichiers           blocs       souple     stricte   inodes    souple   stricte
+   /dev/mapper/hdcrypt             20           9G         10G        7         0         0</code></pre>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo edquota carol-data</code></pre>
+
+<pre class="line-numbers"><code class="language-bash">Quotas disque pour user carol-data (uid 1002) :
+  Système de fichiers           blocs       souple     stricte   inodes    souple   stricte
+    /dev/mapper/hdcrypt             4          15G         20G        1         0         0</code></pre>
+
+
+<p>
+  On peut aussi configurer le temps qu'on autorise au utilisateur de dépasser les limites souples. Ici j'augmente cette limite à 30 jours.
+</p>
+
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo edquota -t</code></pre>
+
+<pre class="line-numbers"><code class="language-bash">Sursis avant l'application des limites souples pour users :
+  Unités de temps peuvent être : days (jours), hours (heures), minutes, ou seconds
+    Système de fichiers  période de sursis bloc  période de sursis inode
+    /dev/mapper/hdcrypt                 30days                 30days</code></pre>
+
+<p>
+  Pour vérifier les quotas des utilisateurs on peut faire :
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice" data-output="2-9"><code class="language-bash">sudo repquota -u /home/crypt</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">*** Rapport pour les quotas user sur le périphérique /dev/mapper/hdcrypt
+Période de sursis bloc : 30days ; période de sursis inode : 30days
+                        Block limits                File limits
+Utilisateur     utilisé souple stricte sursis utilisé souple stricte sursis
+----------------------------------------------------------------------
+root      --      36       0       0              6     0     0
+bob-data  --      20 9437184 10485760              7     0     0
+carol-data --       8 15728640 20971520              2     0     0  </code></pre>
+
+<h2 id="apparmor">Étape 12 (<abbr title="facultative">fac</abbr>) : Apparmor</h2>
+
+<p>
+  On installe maintenant <code>apparmor</code> un logiciel de sécurité qui permet d'isoler et de restreindre le pouvoir d'action des applications du système. Plus précisément c'est un modèle d’accès <abbr title="Mandatory Access Control">MAC</abbr> où une autorité décide des accès d’une application sans que celle-ci puisse les altérer. Voir <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">[ANSSI R45]</a> et <a href="https://debian-handbook.info/browse/fr-FR/stable/sect.apparmor.html">le cahier de l'administrateur Debian</a>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install apparmor apparmor-utils apparmor-profiles</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+  apparmor-profiles-extra
+Les NOUVEAUX paquets suivants seront installés :
+  apparmor apparmor-utils apparmor-profiles</code></pre>
+
+<p>
+  Par défaut un certain nombre de profils sont déjà présents dans le répertoire <code>/etc/apparmor.d</code>. Si on souhaite tous les activer on peut utiliser la commande <code>aa-enforce /etc/apparmor.d/*</code>. On peut voir les profils actifs avec la commande <code>aa-status</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo aa-enforce /etc/apparmor.d/*
+sudo aa-status</code></pre>
+
+<h2 id="dns">Étape 13 (<abbr title="facultative">fac</abbr>) : Résolution DNS</h2>
+
+<p>
+  On peut terminer la configuration du réseau en ajoutant un serveur DNS qui permettra de résoudre les noms de domaine Internet en des adresse IP. Cependant un serveur web n'ayant pas usuellement l'utilité de résoudre des noms de domaine (à part peut-être si des scripts utilisent des nom de domaine plutôt que des adresses IP) cette partie est facultative.<br>
+  On peut choisir le serveur DNS de l’hébergeur ou pour des questions de vie privée on peut choisir des serveurs DNS supposés plus respectueux comme <a href="https://www.fdn.fr/actions/dns/">FDN</a>, <a href="https://www.quad9.net">Quad9</a> ou <a href="https://www.cloudflare.com/fr-fr/learning/dns/what-is-1.1.1.1/">CloudFlare</a>.<br>
+  Pour cela on va installer et configurer <code>systemd-resolved</code>. Plus d'info <a href="https://wiki.archlinux.org/title/Systemd-resolved_(Fran%C3%A7ais)">ici</a>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install systemd-resolved
+sudo nano /etc/systemd/resolved.conf</code></pre>
+
+<figure><figcaption>/etc/systemd/resolved.conf</figcaption>
+  <pre class="line-numbers"><code class="language-log">[Resolve]
+# FDN
+DNS=80.67.169.12 80.67.169.40
+# Quad9
+FallbackDNS=9.9.9.9 149.112.112.112
+Domains=~
+DNSSEC=yes</code></pre></figure>
+
+<p>
+  On termine en relançant le service de <code>systemd-resolved</code> et en vérifiant que la configuration est bien prise en compte.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl restart systemd-resolved
+sudo resolvectl status</code></pre>
+
+<h2 id="backup">Étape 14 (<abbr title="facultative">fac</abbr>) : Sauvegarde de données</h2>
+
+<p>
+  Maintenant qu'on accès au serveur de stockage on peut en profiter pour sauvegarde certaines données de la configuration du serveur. Par exemple on peut récupérer les métadonnées de la partition <code>LUKS</code> précédemment sauvegarder avec la commande <code>cryptsetup luksHeaderBackup</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mv /home/aliceadmin/luks-header-server.img /home/crypt/bob/data/luks-header-server.img
+sudo chown bob-data:bob-data /home/crypt/bob/data/luks-header-server.img</code></pre>        </div>
+      </div>
+    </div>
+  </article>
+
+  <hr>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-12 col-md-10 mx-auto">
+          <p class="navibar left"><a href="bios_install.html">&#11164; Installation de Debian (BIOS)</a><br><a href="uefi_install.html">&#11164; Installation de Debian (UEFI)</a></p>
+          <p class="navibar right"><a href="web-server.html">Configuration du serveur web &#11166;</a></p>
+          <p class="navibar center"><a href="contents.html">Sommaire</a></p>
+          <p class="copyright text-muted">Ce document est sous licence <a href="https://creativecommons.org/licenses/by-nc/4.0/legalcode.fr">CC BY-NC 4.0</a> &nbsp; <a href="https://github.com/Mezalor/DebianServer"><img alt="GitHub" src="github.png"></a></p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="Description complète et détaillée de l'installation et la configuration de Debian 12 sur un serveur ou VPS web avec une attention portée à la sécurité">
+  <meta name="keywords" content="Debian, serveur, installation, configuration, sécurité, web, Bookworm">
+  <meta name="author" content="Mezalor">
+
+  <title>Installation et configuration de Debian 12 sur un serveur</title>
+
+  <link rel="icon" type="image/png" href="fav.png">
+
+  <link href="bootstrap.min.css" rel="stylesheet">
+  <link href="clean-blog.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="prism.css">
+
+  <script src="prism.js"></script>
+
+</head>
+
+<body>
+
+  <header class="masthead" style="background-image: url('debian.avif')">
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-10 mx-auto">
+          <div class="post-heading">
+            <h1>Installation et configuration de Debian 12</h1>
+            <h2 class="subheading"> sur un serveur dédié ou un VPS</h2>
+            <span class="meta">Par
+              <a href="https://github.com/Mezalor">Mezalor</a>
+              le 16 août 2023</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <article>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-12 col-md-20 mx-auto"><h1>Configuration du serveur web</h1>
+
+<p>
+    Dans cette partie nous installerons et configurerons tous les outils nécessaire au fonctionnement d'un serveur web. En particulier on utilisera Apache, PHP et MariaDB.
+</p>
+
+<h2 id="apache">Étape 1 : Apache</h2>
+
+<p>
+    On commence par installer le paquet <code>apache2</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install apache2</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+    apache2-doc apache2-suexec-pristine | apache2-suexec-custom www-browser gdbm-l10n perl-doc libterm-readline-gnu-perl | libterm-readline-perl-perl make libtap-harness-archive-perl
+Paquets recommandés :
+    ssl-cert libldap-common publicsuffix libsasl2-modules netbase
+Les NOUVEAUX paquets suivants seront installés :
+    apache2 apache2-bin apache2-data apache2-utils libapr1 libaprutil1 libaprutil1-dbd-sqlite3 libaprutil1-ldap libcurl4 libgdbm-compat4 libgdbm6 libicu72 libldap-2.5-0 liblua5.3-0 libnghttp2-14 libperl5.36
+    libpsl5 librtmp1 libsasl2-2 libsasl2-modules-db libsqlite3-0 libssh2-1 libxml2 media-types perl perl-modules-5.36</code></pre>
+
+<p>
+    Apache fournit un certain nombre de module (voir la liste <a href="https://httpd.apache.org/docs/2.4/fr/mod/">ici</a>) que l'on peut activer avec la commande <code>a2enmod</code> et désactivé avec la commande <code>a2dismod</code>. Pour voir la liste des modules activés on utilise la commande
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apache2ctl -M</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Loaded Modules:
+core_module (static)
+so_module (static)
+watchdog_module (static)
+http_module (static)
+log_config_module (static)
+logio_module (static)
+version_module (static)
+unixd_module (static)
+access_compat_module (shared)
+alias_module (shared)
+auth_basic_module (shared)
+authn_core_module (shared)
+authn_file_module (shared)
+authz_core_module (shared)
+authz_host_module (shared)
+authz_user_module (shared)
+autoindex_module (shared)
+deflate_module (shared)
+dir_module (shared)
+env_module (shared)
+filter_module (shared)
+mime_module (shared)
+mpm_event_module (shared)
+negotiation_module (shared)
+reqtimeout_module (shared)
+setenvif_module (shared)
+status_module (shared)</code></pre>
+
+<p>
+    Parmi les modules il y a le module MPM (Modules multi-processus) qui a un rôle particulier. Il est responsables de l'association des ports réseau de la machine, accepte les requêtes, et se charge de répartir ces dernières entre les différents processus enfants. Il y a trois MPM différents pour Apache2 : <code>prefork</code>, <code>worker</code> et <code>event</code>.
+</p>
+<ul>
+    <li><code>prefork</code> : est le plus simple des MPM. Il crée plusieurs processus enfants, chacun gérant une seule requête à la fois. Ce MPM est facile à comprendre et à configurer, et constitue un bon choix pour les sites Web simples à faible trafic ou nécessitant une compatibilité et une stabilité maximales.</li>
+    <li><code>worker</code> : est similaire à <code>prefork</code>, mais il utilise plusieurs threads de travail au lieu de processus séparés. Ce MPM est plus efficace que le MPM Prefork, car il peut gérer plusieurs requêtes avec un seul processus. Il est conçu pour les sites Web à fort trafic, et il est particulièrement bien adapté aux sites Web qui nécessitent des performances élevées.</li>
+    <li><code>event</code> : est le plus récent des MPM (introduit dans Apache 2.4). Il est assez similaire au worker MPM mais il est conçu pour gérer des charges plus élevées. Il est conçu pour permettre le traitement d'un nombre accru de requêtes simultanées en déléguant certaines tâches aux threads d'écoute, libérant par là-même les threads de travail et leur permettant de traiter les nouvelles requêtes. C'est le choix par défaut dans Debian 12.</li>
+</ul>
+<p>
+    Pour plus de détails voir la <a href="https://httpd.apache.org/docs/2.4/fr/mpm.html">documentation officielle</a>.<br>
+    On garde ici le MPM <code>event</code>. On peut s'assurer d'utiliser le bon MPM avec la commande
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo a2query -M</code></pre>
+
+<p>
+    On peut désactiver tous les modules qui ne nous sont pas utiles. Par exemple on décide de désactiver <a href="https://httpd.apache.org/docs/2.4/fr/mod/mod_access_compat.html">access_compat_module</a>, <a href="https://httpd.apache.org/docs/2.4/fr/mod/mod_autoindex.html">autoindex</a> et <a href="https://httpd.apache.org/docs/2.4/fr/mod/mod_status.html">status</a>. On en profite également pour désactiver le site <code>000-default</code> générer par défaut lors de l'installation de Apache.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo a2dismod access_compat
+sudo a2dismod -f autoindex
+sudo a2dismod status
+sudo a2dissite 000-default</code></pre>
+
+<p>
+    On active maintenant les modules suivants :
+</p>
+
+<ul>
+    <li><code>headers</code> <a href="https://httpd.apache.org/docs/2.4/fr/mod/mod_headers.html">(doc)</a> : fournit des directives permettant de contrôler et modifier les en-têtes de requêtes et de réponses HTTP.</li>
+    <li><code>http2</code> <a href="https://httpd.apache.org/docs/2.4/fr/mod/mod_http2.html">(doc)</a> : ajoute le support de <a href="https://fr.wikipedia.org/wiki/Hypertext_Transfer_Protocol/2">HTTP/2</a> au serveur HTTP Apache.</li>
+    <li><code>ssl</code> <a href="https://httpd.apache.org/docs/2.4/fr/mod/mod_ssl.html">(doc)</a> : fournit le support TLS v1 au serveur HTTP Apache (pour le support de https).</li>
+</ul>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo a2enmod headers
+sudo a2enmod http2
+sudo a2enmod ssl
+sudo systemctl restart apache2</code></pre>
+
+<p>
+    On peut maintenant configurer Apache et ses différents modules. On commence par supprimer le contenu de <code>/var/www</code> et interdire l'accès à tous les répertoires en commentant les blocs <code>&lt;Directory /usr/share&gt;</code> et <code>&lt;Directory /var/www/&gt;</code>. On ajoute également <code>ServerName localhost</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo rm -R /var/www
+sudo nano /etc/apache2/apache2.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/apache2.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">[...]
+&lt;Directory /&gt;
+Options FollowSymLinks
+AllowOverride None
+Require all denied
+&lt;/Directory&gt;
+
+#&lt;Directory /usr/share&gt;
+#       AllowOverride None
+#       Require all granted
+#&lt;/Directory&gt;
+
+#&lt;Directory /var/www/&gt;
+#       Options Indexes FollowSymLinks
+#       AllowOverride None
+#       Require all granted
+#&lt;/Directory&gt;
+
+ServerName localhost
+[...]</code></pre></figure>
+
+<p>
+    On minimise les données affichées sur la configuration du serveur en éditant les directives <a href="https://httpd.apache.org/docs/current/fr/mod/core.html#servertokens">ServerTokens</a>, <a href="https://httpd.apache.org/docs/current/fr/mod/core.html#serversignature">ServerSignature</a> et <a href="https://httpd.apache.org/docs/current/fr/mod/core.html#traceenable">TraceEnable</a>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/apache2/conf-enabled/security.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/conf-enabled/security.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">ServerTokens Prod
+ServerSignature Off
+TraceEnable Off</code></pre></figure>
+
+<p>
+    On configure Apache pour utiliser exclusivement le protocole HTTP/2
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/apache2/mods-enabled/http2.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/mods-enabled/http2.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">Protocols h2</code></pre></figure>
+
+<p>
+    On s'intéresse maintenant au protocole <abbr title="Transport Layer Security">TLS</abbr>. Pour cela on va suivre les <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-tls/">recommandations de sécurité relatives à TLS</a> de l'ANSSI. On pourra aussi prendre pour référence ce <a href="https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility">guide</a> et le <a href="https://ssl-config.mozilla.org/">générateur de configuration SSL</a> de Mozilla. Pour plus de détails voir la <a href="https://httpd.apache.org/docs/trunk/fr/ssl/ssl_howto.html">documentation officielle</a>.<br>
+    Il faut alors ajouter ou modifier les valeurs suivantes dans le fichier <code>/etc/apache2/mods-enabled/ssl.conf</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/apache2/mods-enabled/ssl.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/mods-enabled/ssl.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">[...]
+SSLCipherSuite TLSv1.3 TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
+SSLHonorCipherOrder off
+SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1 -TLSv1.2
+SSLSessionTickets off</code></pre></figure>
+
+<p>
+    On décide d'utiliser uniquement le protocole TLS en version 1.3 et on ne garde que les trois algorithmes de chiffrement supposés les plus fort.
+</p>
+<p>
+    On passe maintenant à la configuration du module <code>header</code>. Il permet de contrôler et modifier les en-têtes de requêtes et de réponses HTTP. Pour plus de détails sur le protocole HTTP voir <a href="https://developer.mozilla.org/fr/docs/Web/HTTP">ici</a>. Pour améliorer la sécurité on se référera à la référence précédente et aux <a href="https://www.ssi.gouv.fr/guide/recommandations-pour-la-securisation-des-sites-web/">recommandations pour la mise en œuvre d'un site web</a> de l'ANSSI. Voici les en-têtes que l'on va configurer
+</p>
+
+<ul>
+    <li><code>Strict-Transport-Security</code> : Pour éviter de perdre du trafic, les sites web acceptent souvent des connexions en HTTP et les redirigent vers HTTPS, laissant ainsi à un attaquant l’opportunité d’intercepter cette communication. L’utilisation de HTTP Strict Transport Security indique au navigateur d’utiliser automatiquement HTTPS pour tous les accès au site web. Il empêche également un utilisateur d’accepter de poursuivre la navigation sur un site non sécurisé en outrepassant les alertes de sécurité (certificat invalide, certificat généré par une autorité non reconnue, etc.) levées par les navigateurs.</li>
+    <li><code>Content-Security-Policy</code> : permet aux administrateurs d'un site web de contrôler les ressources que l'agent utilisateur est autorisé à charger pour une page donnée. Implémenté par tous les navigateurs modernes, <abbr title="Content Security Policy">CSP</abbr> est à mettre en place lors de l’intégration d’un site web. Il s’agit d’une contre-mesure très efficace contre le <abbr title="cross-site scripting">XSS</abbr> qui vient en complément des bonnes pratiques de conception et de développement. CSP est une mesure de défense en profondeur forte, mais elle ne se substitue pas à la correction des vulnérabilités identifiées dans l’application web. Pour avoir une liste assez exhaustive des directives CSP se réferer <a href="https://developer.mozilla.org/fr/docs/Web/HTTP/Headers/Content-Security-Policy">ici</a>.</li>
+    <li><code>Feature-Policy</code> : fournit un mécanisme pour permettre ou interdire l'utilisation de fonctionnalités du navigateur pour le document courant et le contenu que ce dernier embarquerait via des éléments iframe. Cet en-tête a maintenant été renommé <code>Permissions-Policy</code> dans la spécification</li>
+    <li><code>Referrer-Policy</code> : Pour chaque requête émise, le navigateur positionne automatiquement l’en-tête Referer, qui indique l’URL de la ressource depuis laquelle l’URL cible a été obtenue. Cela a lieu lors de la navigation d’une page web à une autre (ex. : clic sur un lien), mais aussi lors du chargement de ressources (ex. : images, scripts, etc.) depuis une page web existante. Il peut être utile pour un site web de récupérer l’URL de la page web précédemment visitée pour l’analyse statistique, l’optimisation du cache, la journalisation et d’autres raisons légitimes. La spécification présente plusieurs options de configuration :
+    <ul>
+        <li><code>no-referrer</code> : Aucune information n’est transmise via l’en-tête Referer.</li>
+        <li><code>no-referrer-when-downgrade</code> : L’URL complète est utilisée en tant que Referer sauf dans le cas du passage de HTTPS à HTTP. Il s’agit du comportement par défaut du standard en l’absence de Referrer-Policy.</li>
+        <li><code>origin</code> : L’Origin est utilisée en tant que Referer et non l’URL complète.</li>
+        <li><code>same-origin</code> : Aucune information n’est transmise via l’en-tête Referer, sauf dans le cas d’accès au site courant où l’URL complète est utilisée.</li>
+        <li><code>strict-origin</code> : L’Origin est utilisée en tant que Referer uniquement lorsque la communication s’effectue vers une destination de sécurité au moins équivalente ou supérieure : HTTP vers HTTP, HTTP vers HTTPS ou HTTPS vers HTTPS.</li>
+        <li><code>origin-when-cross-origin</code> : L’URL complète est utilisée en tant que Referer pour le site courant, l’Origin est utilisée pour les autres cas.</li>
+        <li><code>strict-origin-when-cross-origin</code> : L’URL complète est utilisée en tant que Referer pour le site courant, l’Origin est utilisée pour les autres cas à la condition que la sécurité de la destination soit au moins équivalente ou supérieure (cf. strict-origin). Dans le cas contraire aucun Referer ne sera transmis. Remarque : il s’agit du comportement par défaut dans certaines implémentations navigateur.</li>
+        <li><code>unsafe-url</code> : L’URL complète est utilisée en tant que Referer, y compris lors de la navigation d’une page HTTPS vers une page HTTP. <b>Ne doit pas être utilisée.</b></li>
+    </ul></li>
+    <li><code>X-Frame-Options</code> : Le détournement de clic, ou clickjacking, est un type d’attaque dans lequel une page web trompeuse incite un utilisateur légitime à cliquer sur du contenu en apparence légitime qui le mène en réalité à effectuer des actions, à son insu, sur d’autres sites. Ces attaques sont en général mises en œuvre au moyen d’une page piégée incluant des cadres (iframes) invisibles qui pointent vers des sites légitimes sur lesquels l’utilisateur piégé a ouvert une session. La protection contre ce type d’attaques consiste en la mise en place de mécanismes qui interdisent au navigateur l’inclusion du site à protéger dans un site tiers au travers d’une frame ou iframe. Pour des raisons de compatibilité avec certains navigateurs, il est aussi possible de recourir à l’en-tête non standard X-Frame-Options, rendu obsolète par CSP, qui permet de préciser la stratégie d’affichage des contenus du site. <code>X-Frame-Options: deny</code> est équivalent à <code>frame-ancestors 'none'</code>.</li>
+    <li><code>X-Content-Type-Options</code> : permet d'indiquer que les types MIME annoncés dans les en-têtes <code>Content-Type</code> ne doivent pas être modifiés et suivis.</li>
+    <li><code>X-Powered-By</code> : L'en-tête X-Powered-By décrit les technologies utilisées par le serveur Web. Ces informations exposent le serveur aux attaquants. En utilisant les informations contenues dans cet en-tête, les attaquants peuvent trouver plus facilement les vulnérabilités.</li>
+    <li><code>X-XSS-Protection</code> : L’en-tête non-standard X-XSS-Protection n’est plus préconisé pour se prémunir des vulnérabilités XSS. Cet en-tête permettait la configuration d’une heuristique de filtrage XSS implémentée par les navigateurs. L’augmentation de la surface d’attaque entraînée par l’implémentation de ce filtre, l’introduction de nouvelles vulnérabilités et l’existence de contournements font que le support de ce mécanisme est en cours de retrait par certains navigateurs et a déjà été retiré par d’autres. La mesure de sécurité standardisée à mettre en œuvre est Content Security Policy, qui offre une protection supérieure contre ce type d’attaques. L’usage de X-XSS-Protection ne présente d’intérêt que pour les navigateurs anciens qui ne supporteraient pas CSP.</li>
+    <li><code>Expect-CT</code> : L'en-tête Expect-CT a été conçu pour permettre aux sites Web d'accepter l'application de la transparence des certificats avant qu'elle ne soit appliquée par défaut. Cependant, à partir de mai 2018, les nouveaux certificats devraient prendre en charge les SCT par défaut, ce qui rend l'en-tête Expect-CT obsolète. <b>Cette en-tête n'est donc pas utile.</b></li>
+    <li><code>Proxy</code> : <code>httpoxy</code> est un ensemble de vulnérabilités qui affectent le code d'application s'exécutant dans des environnements CGI ou de type CGI. Cela conduit à une vulnérabilité exploitable à distance. Si vous utilisez PHP ou CGI, vous devez bloquer l'en-tête Proxy. Pour plus de détails voir <a href="https://httpoxy.org">ici</a>.</li>
+</ul>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/apache2/mods-enabled/headers.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/mods-enabled/headers.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+Header set Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none';"
+Header set Feature-Policy "camera 'none'; geolocation 'none'; microphone 'none';"
+Header always set Referrer-Policy "same-origin"
+Header always set X-Frame-Options "deny"
+Header always set X-Content-Type-Options "nosniff"
+Header always unset X-Powered-By
+#Header always set X-XSS-Protection "0"
+RequestHeader unset Proxy early</code></pre></figure>
+
+<p>
+    Pour vérifier les en-têtes envoyer par un site web on peut utiliser la commande <code>curl -I</code>. Par exemple
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">curl -I http://gnu.le-site-alice.fr</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">HTTP/2 200
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+referrer-policy: same-origin
+x-frame-options: deny
+x-content-type-options: nosniff
+last-modified: Fri, 16 Sep 2022 17:17:00 GMT
+etag: "32a1-905164a0ae2eb"
+accept-ranges: bytes
+content-length: 9408
+vary: Accept-Encoding
+content-security-policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none';
+feature-policy: camera 'none'; geolocation 'none'; microphone 'none';
+content-type: text/html
+date: Wed, 16 Aug 2023 15:05:37 GMT
+server: Apache</code></pre>
+
+<p>
+    On peut vérifier que la configuration est correcte (au niveau de la syntaxe) avec la commande <code>apachectl configtest</code> puis redémarrer le service <code>apache</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apachectl configtest
+sudo systemctl restart apache2</code></pre>
+
+<h2 id="certificate">Étape 2 : Certificats Let's encrypt</h2>
+
+<p>
+    Dans cette partie on configure le serveur pour l'associer à un nom de domaine et à un certificat qui permettra d'utiliser le protocole TLS (et donc avoir une adresse en <code>https</code>). Cela permettra d'authentifier le serveur et d'assurer la confidentialité et l'intégrité des données échangées grâce au chiffrement.
+</p>
+<p>
+    Pour cela il faut tout d'abord associer notre nom de domaine (ou un sous domaine) à l'adresse IP de notre serveur en configurant un serveur <abbr title="Domain Name System">DNS</abbr>. Ici on prendra directement le serveur DNS du registraire à qui on loue le nom de domaine. Disons que notre nom de domaine est <code>le-site-alice.fr</code> et qu'on veuille utiliser les sous-domaines <code>gnu.le-site-alice.fr</code> et <code>tux.le-site-alice.fr</code>. Il faut alors ajouter la ligne suivante dans le fichier de configuration DNS. Pour plus d'information voir <a href="https://help.ovhcloud.com/csm/fr-dns-edit-dns-zone?id=kb_article_view&sysparm_article=KB0051684">ici</a>.
+</p>
+
+<pre class="line-numbers"><code class="language-apacheconf">gnu IN A 10.11.12.13
+tux IN A 10.11.12.13</code></pre>
+
+<p>
+    On créer ensuite les répertoires des deux sites.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir /home/www/gnu
+sudo mkdir /home/www/tux
+sudo chown -R aliceweb:www-data /home/www/gnu
+sudo chown -R aliceweb:www-data /home/www/tux</code></pre>
+
+<p>
+    Avant de pouvoir mettre en place la connection sécurisée aux sites avec <code>https</code> on doit avoir un accès au site sur le port 80 (en <code>http</code>) pour pouvoir effectuer le <a href="https://letsencrypt.org/fr/docs/challenge-types/">challenge HTTP-01</a>. On configure donc les <code>VirtualHost</code> pour chaque site.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/apache2/sites-available/gnu.le-site-alice.fr.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/sites-available/gnu.le-site-alice.fr.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">&lt;VirtualHost *:80&gt;
+
+	ServerName gnu.le-site-alice.fr
+
+	DocumentRoot "/home/www/gnu"
+	&lt;Directory "/home/www/gnu"&gt;
+		Require all granted
+	&lt;/Directory&gt;
+
+&lt;/VirtualHost&gt;</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo a2ensite gnu.le-site-alice.fr
+sudo nano /etc/apache2/sites-available/tux.le-site-alice.fr.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/sites-available/tux.le-site-alice.fr.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">&lt;VirtualHost *:80&gt;
+
+    ServerName tux.le-site-alice.fr
+
+    DocumentRoot "/home/www/tux"
+    &lt;Directory "/home/www/tux"&gt;
+        Require all granted
+    &lt;/Directory&gt;
+
+&lt;/VirtualHost&gt;</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo a2ensite tux.le-site-alice.fr
+sudo systemctl reload apache2</code></pre>
+
+<p>
+    On utilisera l'autorité de certification <a href="https://letsencrypt.org/fr/">Let’s Encrypt</a> pour générer les certificats de nos sites. Pour tous les détails sur son fonctionnement on peut se référer à cette <a href="https://letsencrypt.org/fr/how-it-works/">page</a>.<br>
+    Ce service utilise le protocole <code>ACME</code> pour générer automatiquement un certificat. On commence donc par installer un client ACME. On peut avoir une liste assez complète de tous les client ACME <a href="https://letsencrypt.org/fr/docs/client-options/">ici</a>. On choisit le logiciel <code>uacme</code> (voir le <a href="https://github.com/ndilieto/uacme/">GitHub</a>). C'est un logiciel assez minimaliste codé en C qui a l'avantage d'être déjà présent dans les dépôts de Debian 12.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install uacme</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Les NOUVEAUX paquets suivants seront installés :
+    libcurl3-gnutls libev4 uacme</code></pre>
+
+<p>
+    Ce logiciel ne nécessitant pas d'être exécuter avec les droits administrateurs on va créer un utilisateur dédié à son utilisation.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo adduser acme</code></pre>
+
+<p>
+    On créer le répertoire <code>/etc/letsencrypt</code> qui sera utilisé par <code>acme</code> pour générer les clefs et certificat
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir /etc/letsencrypt
+sudo chown acme:acme /etc/letsencrypt</code></pre>
+
+<p>
+    et on créer le répertoire nécessaire à la résolution du challenge sur chaque site. On lui donne les bons droits.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mkdir /home/www/gnu/.well-known
+sudo chown -R acme:www-data /home/www/gnu/.well-known
+sudo mkdir /home/www/tux/.well-known
+sudo chown -R acme:www-data /home/www/tux/.well-known</code></pre>
+
+<p>
+    On passe sur le compte <code>acme</code> et on créer un compte sur Let's encrypt avec la commande <code>uacme new</code>. La clef privée de ce compte sera dans le fichier <code>/etc/letsencrypt/private/key.pem</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">su acme</code></pre>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">uacme -v -y -c /etc/letsencrypt new</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">uacme: created directory /etc/letsencrypt/private
+uacme: loading key from /etc/letsencrypt/private/key.pem
+uacme: /etc/letsencrypt/private/key.pem not found
+uacme: generating new 2048-bit RSA key
+uacme: key saved to /etc/letsencrypt/private/key.pem
+uacme: fetching directory at https://acme-v02.api.letsencrypt.org/directory
+uacme: creating new account at https://acme-v02.api.letsencrypt.org/acme/new-acct
+uacme: terms at https://letsencrypt.org/documents/LE-SA-v1.3-September-21-2022.pdf autoaccepted (-y)
+uacme: account created at https://acme-v02.api.letsencrypt.org/acme/acct/1254539256</code></pre>
+
+<p>
+    Pour générer le certificat d'un site on doit prouver que l'on contrôle bien le nom de domaine en résolvant un challenge. On va utiliser le <a href="https://letsencrypt.org/fr/docs/challenge-types/">challenge HTTP-01</a> qui consiste à déposer un certain code fourni par l'autorité de certification à une certaine adresse. La certification se fait en 4 étapes :
+</p>
+
+<ol>
+    <li>on fait une demande de certification à Let's encrypt ;</li>
+    <li>Let's encrypt nous demande de résoudre le Challenge avec certains codes ;</li>
+    <li>on crée la page nécessaire sur notre site pour résoudre le challenge ;</li>
+    <li>Let's encrypt confirme la bonne résolution du challenge en nous fournissant le certificat.</li>
+</ol>
+
+<p>
+    Pour faire une demande de certification on utilise la commande <code>uacme issue</code>. Pour automatiser la demande de certificat, on créer le script suivant qui sera donné en paramètre à <code>uacme</code> et qui permettra de faire les opérations nécessaire à la résolution du challenge dans l'étape 3.
+</p>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">mkdir /etc/letsencrypt/scripts
+nano /etc/letsencrypt/scripts/gnu.sh</code></pre>
+
+<figure><figcaption>/etc/letsencrypt/scripts/gnu.sh</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/bin/bash
+
+SITE_PATH=/home/www/gnu
+
+METHOD=$1
+TYPE=$2
+IDENT=$3
+TOKEN=$4
+AUTH=$5
+
+if [ "$METHOD" = "begin" ]
+then
+    mkdir -p "$SITE_PATH"/.well-known/acme-challenge
+    echo "$AUTH" > "$SITE_PATH"/.well-known/acme-challenge/"$TOKEN"
+    exit $?
+elif [ "$METHOD" = "done" ] || [ "$METHOD" = "failed" ]
+then
+    rm -R "$SITE_PATH"/.well-known/acme-challenge
+    exit $?
+else
+    exit 1
+fi</code></pre></figure>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">chmod +x /etc/letsencrypt/scripts/gnu.sh</code></pre>
+
+<p>
+    Le script est appelé à l'étape 3 avec la variable <code>$METHOD</code> valant <code>begin</code>. On créer alors le fichier du nom de la valeur <code>$TOKEN</code> et contenant la valeur de <code>$AUTH</code> pour résoudre le challenge. Ensuite le script est de nouveau appelé à la toute fin avec la variable <code>$METHOD</code> valant <code>done</code> (si tout s'est bien passé) ce qui nous permet de nettoyer le fichier ajouté pour le challenge.
+</p>
+
+<p>
+    On peut alors générer le certificat avec la commande
+</p>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">uacme -v -c /etc/letsencrypt -t EC -h /etc/letsencrypt/scripts/gnu.sh issue gnu.le-site-alice.fr</code></pre>
+
+<p>
+    On choisit ici d'utiliser l'algorithme de chiffrement asymétrique ECDSA en 256 bits sur la courbe <code>prime256v1</code> au lieu d'utiliser RSA en 2048 bits ou 4096 bits.<br>
+    Cela génère deux fichiers : <code>/etc/letsencrypt/gnu.le-site-alice.fr/cert.pem</code> qui est le certificat fourni par Let's encrypt et <code>/etc/letsencrypt/private/gnu.le-site-alice.fr/key.pem</code> qui est la clef privée qui permet de générer les signatures numériques.
+</p>
+
+<p>
+    Il faut maintenant faire la même chose pour le site <code>tux.le-site-alice.fr</code><div class=""></div>
+</p>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">nano /etc/letsencrypt/scripts/tux.sh</code></pre>
+
+<figure><figcaption>/etc/letsencrypt/scripts/tux.sh</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/bin/bash
+
+SITE_PATH=/home/www/tux
+
+METHOD=$1
+TYPE=$2
+IDENT=$3
+TOKEN=$4
+AUTH=$5
+
+if [ "$METHOD" = "begin" ]
+then
+    mkdir -p "$SITE_PATH"/.well-known/acme-challenge
+    echo "$AUTH" > "$SITE_PATH"/.well-known/acme-challenge/"$TOKEN"
+    exit $?
+elif [ "$METHOD" = "done" ] || [ "$METHOD" = "failed" ]
+then
+    rm -R "$SITE_PATH"/.well-known/acme-challenge
+    exit $?
+else
+    exit 1
+fi</code></pre></figure>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">chmod +x /etc/letsencrypt/scripts/tux.sh
+uacme -v -c /etc/letsencrypt -t EC -h /etc/letsencrypt/scripts/tux.sh issue tux.le-site-alice.fr</code></pre>
+
+<p>
+    Pour simplifier le renouvellement des certificat on va écrire un script permettant de renouveler les certificats de tous les sites.
+</p>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">nano /etc/letsencrypt/renew_cert.sh</code></pre>
+
+<figure><figcaption>/etc/letsencrypt/renew_cert.sh</figcaption>
+<pre class="line-numbers"><code class="language-bash">#!/bin/bash
+
+uacme -v -c /etc/letsencrypt -t EC -h /etc/letsencrypt/scripts/gnu.sh issue gnu.le-site-alice.fr
+uacme -v -c /etc/letsencrypt -t EC -h /etc/letsencrypt/scripts/tux.sh issue tux.le-site-alice.fr</code></pre></figure>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">chmod +x /etc/letsencrypt/renew_cert.sh</code></pre>
+
+<p>
+    On peut alors se déconnecter du compte <code>acme</code> et le verrouiller.
+</p>
+
+<pre class="command-line" data-user="acme" data-host="webalice"><code class="language-bash">exit</code></pre>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo usermod -L -s /usr/sbin/nologin acme</code></pre>
+
+<p>
+    Chaque certificat Let's encrypt a une durée de validité de 90 jours. On va donc automatiser le renouvellement des certificats. Pour cela on crée un service et un <a href="https://wiki.archlinux.org/title/Systemd_(Fran%C3%A7ais)/Timers_(Fran%C3%A7ais)">timer</a> systemd pour chaque site. On décide de renouveler les certificats tous les lundis à 5h (dans un intervalle de 1h). Par défaut <code>uacme</code> ne renouvellera le certificat que s'il arrive à expiration dans moins de 30 jours.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /root/renew_cert.service</code></pre>
+
+<figure><figcaption>/root/renew_cert.service</figcaption>
+<pre class="line-numbers"><code class="language-bash">[Unit]
+Description=Renew Lets encrypt cert
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/letsencrypt/renew_cert.sh
+User=acme
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /root/renew_cert.timer</code></pre>
+
+<figure><figcaption>/root/renew_cert.timer</figcaption>
+<pre class="line-numbers"><code class="language-bash">[Unit]
+Description=Renew Lets encrypt cert
+
+[Timer]
+OnCalendar=Mon *-*-* 5:00:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target</code></pre></figure>
+
+<p>
+    On peut maintenant activer le service et le timer et les tester
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl enable /root/renew_cert.service
+sudo systemctl enable /root/renew_cert.timer
+sudo systemctl start renew_cert.service
+sudo journalctl -u renew_cert.service
+sudo systemctl start renew_cert.timer
+sudo systemctl status renew_cert.timer
+sudo systemctl list-timers</code></pre>
+
+<p>
+    On peut également, pour vérification, afficher le certificat avec la commande
+</p>
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo openssl x509 -in /etc/letsencrypt/gnu.le-site-alice.fr/cert.pem -noout -text</code></pre>
+
+<p>
+    On finit en configurant Apache. On commence par activer l'agrafage OCSP. Le protocole OCSP permet de vérifier la validité d'un certificat numérique TLS en temps-réel auprès de l'autorité ayant émis le certificat. L’agrafage OCSP consiste à attacher (agrafer) à l’échange initial TLS, une réponse OCSP horodatée et signée par l’Autorité de certification (CA), permettant d'économiser au client TLS la vérification auprès de la CA. Pours plus de détails voir <a href="https://fr.wikipedia.org/wiki/Agrafage_OCSP">ici</a> et <a href="https://httpd.apache.org/docs/trunk/fr/ssl/ssl_howto.html#ocspstapling">là</a>.
+</p>
+
+<p>
+    Pour cela on ajoute à la toute fin du fichier <code>/etc/apache2/mods-enabled/ssl.conf</code> les directives <a href="https://httpd.apache.org/docs/trunk/mod/mod_ssl.html#sslusestapling">SSLUseStapling</a> et <a href="https://httpd.apache.org/docs/trunk/mod/mod_ssl.html#sslstaplingcache">SSLStaplingCache</a>
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/apache2/mods-enabled/ssl.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/mods-enabled/ssl.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">[...]
+SSLUseStapling On
+SSLStaplingCache "shmcb:logs/ssl_stapling(32768)"</code></pre></figure>
+
+<p>
+    On configure maintenant les <code>VirtualHost</code>. Par chacun des sites
+</p>
+
+<ul>
+    <li>On autorise la connection au port 80 (http) à l'adresse <code>*.le-site-alice.fr/.well-known/acme-challenge/*</code> pour le résolution du challenge ACME nécessaire au renouvellement du certificat.</li>
+    <li>On redirige toutes les autres requêtes sur le port 80 (adresse en <code>http</code>) vers la même adresse en <code>https</code>.</li>
+    <li>On autorise toutes les requêtes sur le port 443 et on active la connection chiffrée avec <code>SSLEngine on</code> et on indique l'emplacement du certificat et de la clef privée.</li>
+    <li>Pour séparer les logs de chaque site on ajoute les directives <code>ErrorLog</code> et <code>CustomLog</code>.</li>
+</ul>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo rm /etc/apache2/sites-available/gnu.le-site-alice.fr.conf
+sudo nano /etc/apache2/sites-available/gnu.le-site-alice.fr.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/sites-available/gnu.le-site-alice.fr.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">&lt;VirtualHost *:80&gt;
+
+	ServerName gnu.le-site-alice.fr
+
+	DocumentRoot "/home/www/gnu"
+	&lt;Directory "/home/www/gnu/.well-known/acme-challenge"&gt;
+		Require all granted
+    &lt;/Directory&gt;
+
+	RedirectMatch permanent "^(/(?!.well-known/acme-challenge/).*)" "https://gnu.le-site-alice.fr$1"
+
+&lt;/VirtualHost&gt;
+
+&lt;VirtualHost *:443&gt;
+
+	ServerName gnu.le-site-alice.fr
+
+	DocumentRoot "/home/www/gnu"
+	&lt;Directory "/home/www/gnu"&gt;
+		Require all granted
+    &lt;/Directory&gt;
+
+	SSLEngine on
+	SSLCertificateFile      /etc/letsencrypt/gnu.le-site-alice.fr/cert.pem
+	SSLCertificateKeyFile   /etc/letsencrypt/private/gnu.le-site-alice.fr/key.pem
+
+	ErrorLog /var/log/apache2/error.gnu.le-site-alice.fr.log
+	CustomLog /var/log/apache2/access.gnu.le-site-alice.fr.log combined
+
+&lt;/VirtualHost&gt;</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo rm /etc/apache2/sites-available/tux.le-site-alice.fr.conf
+sudo nano /etc/apache2/sites-available/tux.le-site-alice.fr.conf</code></pre>
+
+<figure><figcaption>/etc/apache2/sites-available/tux.le-site-alice.fr.conf</figcaption>
+<pre class="line-numbers"><code class="language-apacheconf">&lt;VirtualHost *:80&gt;
+
+	ServerName tux.le-site-alice.fr
+
+	DocumentRoot "/home/www/tux"
+	&lt;Directory "/home/www/tux/.well-known/acme-challenge"&gt;
+		Require all granted
+    &lt;/Directory&gt;
+
+	RedirectMatch permanent "^(/(?!.well-known/acme-challenge/).*)" "https://tux.le-site-alice.fr$1"
+
+&lt;/VirtualHost&gt;
+
+&lt;VirtualHost *:443&gt;
+
+	ServerName tux.le-site-alice.fr
+
+	DocumentRoot "/home/www/tux"
+	&lt;Directory "/home/www/tux"&gt;
+		Require all granted
+    &lt;/Directory&gt;
+
+	SSLEngine on
+	SSLCertificateFile      /etc/letsencrypt/tux.le-site-alice.fr/cert.pem
+	SSLCertificateKeyFile   /etc/letsencrypt/private/tux.le-site-alice.fr/key.pem
+
+	ErrorLog /var/log/apache2/error.tux.le-site-alice.fr.log
+	CustomLog /var/log/apache2/access.tux.le-site-alice.fr.log combined
+
+&lt;/VirtualHost&gt;</code></pre></figure>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl reload apache2</code></pre>
+
+<p>
+    Les deux sites web d'Alice sont maintenant accessibles en https. Pour tester on peut monter le repertoire dédié aux sites web sur la machine locale avec la commande
+</p>
+
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">knock -d 100 10.11.12.13 1111:tcp 2222:udp 3333:tcp 4444:udp && sshfs aliceweb@10.11.12.13:/data /home/alice/pointDeMontage -p 32 -o IdentityFile=~/.ssh/webalice/aliceweb-ed25519</code></pre>
+
+<p>
+    puis déposer une page web statique dans l'un des deux répertoires <code>gnu</code> et <code>tux</code>.
+</p>
+
+<h2 id="php">Étape 3 : PHP</h2>
+
+<p>
+    Dans le cas où l'on souhaite un site web dynamique, par exemple pour pouvoir utiliser des formulaires, on doit utiliser un language de programmation pour produire dynamiquement les pages du site. Le language le plus utilisé pour cela est <abbr title="PHP Hypertext Preprocessor">PHP</abbr> mais on pourrait utiliser tout autre language interprété comme par exemple Python. Nous faisons ici le choix d'utiliser PHP.
+</p>
+
+<p>
+    Il existe plusieurs modes d'exécution de PHP sur un serveur Apache :
+</p>
+
+<ul>
+    <li>Le module Apache (le paquet <code>libapache2-mod-php8.2</code> sous Debian). Cette méthode ne fonctionne que pour le <abbr title="Modules multi-processus">MPM</abbr> <code>prefork</code>. Lors de l'utilisation de ce module, l'interpréteur PHP est intégré dans chaque processus Apache (et on rappelle qu'avec le MPM <code>prefork</code>, une requête engendre un processus). De cette façon, chaque processus Apache est capable de gérer et d'exécuter lui-même des scripts PHP, éliminant ainsi le besoin de traiter avec des processus externes ; contrairement à CGI ou FastCGI. Cela le rend très utile pour les sites "lourds en PHP" où de nombreuses requêtes sont susceptibles de contenir du code PHP (comme WordPress, Drupal, Joomla, etc.) car toutes les requêtes peuvent être gérées par Apache. L'inconvénient est que l'empreinte de chaque processus Apache est plus importante car il nécessite plus de ressources système. Même lors de la diffusion de contenu statique tel que des images, du texte et des feuilles de style où aucun code PHP n'a besoin d'être exécuté, le processus contient toujours l'interpréteur PHP.</li>
+    <li>L'utilisation de l'interface <abbr title="Common Gateway Interface">CGI</abbr> est la manière traditionnelle d'exécuter des applications sur un serveur Web. Cependant elle est très inefficace et rarement utilisée. Elle a été introduite à l'origine dans les années 1990, mais a été jugé trop inefficace pour être utilisée sur autre chose que de très petits sites. L'exécution d'applications sur CGI présente l'avantage de séparer l'exécution du code du serveur Web, ce qui offre des avantages supplémentaires en matière de sécurité. Par exemple, un script PHP bogué ou non sécurisé exécuté via CGI ne peut pas corrompre ou affecter la sécurité d'autres fichiers en dehors du domaine sur lequel il est hébergé. Cela signifie également que l'interpréteur PHP n'est appelé qu'en cas de besoin, permettant ainsi au contenu statique d'être servi uniquement par le serveur Web. L'inefficacités de l'exécution de PHP avec le support CGI résulte de la nécessité de créer un nouveau processus chaque fois qu'un code PHP doit être exécuté. Cela peut être très gourmand en ressources.</li>
+    <li>FastCGI a été introduit comme un compromis entre le module PHP Apache et l'application CGI. Il permet aux scripts d'être exécutés par un interpréteur en dehors du serveur Web et inclut les avantages de sécurité de CGI mais n'inclut aucune des inefficacités de CGI. Lors de l'exécution de scripts PHP avec FastCGI, chaque requête est transmise du serveur Web à FastCGI via un socket de communication. Cela permet une évolutivité beaucoup plus grande car le serveur Web et l'interpréteur PHP peuvent être divisés en leurs propres environnements de serveur individuels si nécessaire.</li>
+    <li>PHP-FPM (PHP-FastCGI Process Manager) est une implémentation FastCGI alternative pour PHP dans un serveur Web. Ici, nous avons toujours (au moins) un processus PHP-FPM parallèle au processus du serveur Web qui gère l'interprétation PHP. Les processus FPM se regroupent en différents "pools". Dans ces pools, il y aura généralement plusieurs processus créés qui gèrent l'interprétation PHP pour une page Web spécifique.</li>
+</ul>
+
+<p>
+    Nous utiliserons <code>PHP-FPM</code>. On commence par installer le paquet <code>php-fpm</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install php-fpm</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+    file php-pear
+Les NOUVEAUX paquets suivants seront installés :
+    libmagic-mgc libmagic1 libsodium23 php-common php-fpm php8.2-cli php8.2-common php8.2-fpm php8.2-opcache php8.2-readline psmisc</code></pre>
+
+
+<p>
+    Il faut également activer le module <code>proxy_fcgi</code> et la configuration <code>php8.2-fpm</code> pour permettre le serveur Apache et l'interpréteur PHP de communiquer via <code>PHP-FPM</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo a2enmod proxy_fcgi
+sudo a2enconf php8.2-fpm</code></pre>
+
+<p>
+    On peut alors configurer PHP en éditant les fichiers suivants : <code>/etc/php/8.2/fpm/pool.d/www.conf</code> et <code>/etc/php/8.2/fpm/php.ini</code>.
+</p>
+
+<p>
+    Dnas le fichier <code>/etc/php/8.2/fpm/pool.d/www.conf</code> on configure les paramètres des <code>pools</code>. Pour plus d'informations voir la <a href="https://www.php.net/manual/fr/install.fpm.configuration.php">documentation</a>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/php/8.2/fpm/pool.d/www.conf</code></pre>
+
+<figure><figcaption>/etc/php/8.2/fpm/pool.d/www.conf</figcaption>
+<pre class="line-numbers"><code class="language-ini">[www]
+user = aliceweb
+group = aliceweb
+listen = /run/php/php8.2-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+pm = ondemand
+pm.max_children = 32
+pm.process_idle_timeout = 10s</code></pre></figure>
+
+<p>
+    On modifie les valeur de <code>user</code> et <code>group</code> car on souhaite que l'utilisateur propriétaire des processus PHP soit <code>aliceweb</code>. On peut également modifier le paramètre <code>pm</code> pour améliorer les performances du serveur PHP.
+</p>
+
+<ul>
+    <li>En mettant <code>pm = static</code> le serveur gardera en permanance un nombre fixe de processus PHP (pools). C'est la solution la plus performante mais la moins flexible car il faut connaitre une bonne estimation de la fréquentation des sites sur le serveur.</li>
+    <li>En mettant <code>pm = dynamic</code> on peut déterminer le nombre minimum et le maximum de processus PHP. C'est une solution pertinente pour des sites à traffic moyen qui flucte legerment.</li>
+    <li>En mettant <code>pm = ondemand</code> aucun processus n'est créer automatiquement au démarrage mais ils vont se créer et détruire en fonction des requêtes. C'est en théorie la solution la moins performante mais en pratique elle est très acceptable pour les sites à faible traffic ou à grosse varaiation de traffic. C'est aussi la solution la plus économe en ressource car seul les processus utilisés sont créés.</li>
+</ul>
+
+<p>
+    Pour plus d'information sur ces trois possibilités voir <a href="https://www.malekal.com/optimiser-php-fpm/">ici</a> ou pour avoir une étude assez complète (avec un benchmark) voir <a href="https://haydenjames.io/php-fpm-tuning-using-pm-static-max-performance/">là</a>.
+</p>
+
+<p>
+    On a fait le choix ici d'utiliser <code>pm = ondemand</code> avec <code>pm.max_children = 32</code> pour un serveur de 4Go de RAM.
+</p>
+
+<p>
+    On passe alors au fichier <code>/etc/php/8.2/fpm/php.ini</code> de configuration général de PHP. Voir la <a href="https://www.php.net/manual/fr/ini.core.php">documentation</a> pour plus de détails. C'est un fichier imposant donc on indiquera ici uniquement les modifications effectuées par rapport au fichier fourni par défaut par Debian. Toutes les options y sont très bien documentées et par défaut ces options sont mises sur des valeurs pour un serveur en production.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo nano /etc/php/8.2/fpm/php.ini</code></pre>
+
+<figure><figcaption>/etc/php/8.2/fpm/php.ini</figcaption>
+<pre class="line-numbers"><code class="language-ini">;;;;;;;;;;;;;;;;;;;;
+; Language Options ;
+;;;;;;;;;;;;;;;;;;;;
+open_basedir = /home/www/
+disable_functions = exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec,parse_ini_file,show_source,pcntl_alarm,pcntl_fork,pcntl_waitpid,pcntl_wait,pcntl_wifexited,pcntl_wifstopped,pcntl_wifsignaled,pcntl_wifcontinued,pcntl_wexitstatus,pcntl_wtermsig,pcntl_wstopsig,pcntl_signal,pcntl_signal_get_handler,pcntl_signal_dispatch,pcntl_get_last_error,pcntl_strerror,pcntl_sigprocmask,pcntl_sigwaitinfo,pcntl_sigtimedwait,pcntl_exec,pcntl_getpriority,pcntl_setpriority,pcntl_async_signals,
+;;;;;;;;;;;;;;;;;;;
+; Module Settings ;
+;;;;;;;;;;;;;;;;;;;
+[Date]
+date.timezone = Europe/Paris
+[opcache]
+opcache.enable = 1</code></pre></figure>
+
+<p>
+    On finit en redémarrant le service PHP et en relançant le serveur apache.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo systemctl restart php8.2-fpm
+sudo systemctl reload apache2</code></pre>
+
+<p>
+    Pour avoir une vue assez détaillée des paramètres prise en compte par PHP, on peut créer un fichier PHP contenant <code>&lt;?php phpinfo(); ?&gt;</code>. Attention cependant les informations contenues sur cette page sont sensibles et ne doivent pas être publiques.
+</p>
+
+<h2 id="sql">Étape 4 : MariaDB</h2>
+
+<p>
+    On termine par l'installation de MariaDB, un système de gestion de base de données qui est une alternative libre à MySQL. On commence par installer le paquet <code>mariadb-server</code>.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install mariadb-server</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Paquets suggérés :
+    gawk-doc libclone-perl libmldbm-perl libnet-daemon-perl libsql-statement-perl mailx mariadb-test netcat-openbsd readline-doc python3 python3-braceexpand
+Paquets recommandés :
+    libgpm2 libdbd-mariadb-perl | libdbd-mysql-perl libterm-readkey-perl libhtml-template-perl mariadb-plugin-provider-bzip2 mariadb-plugin-provider-lz4 mariadb-plugin-provider-lzma mariadb-plugin-provider-lzo mariadb-plugin-provider-snappy pv
+Les NOUVEAUX paquets suivants seront installés :
+    galera-4 gawk libconfig-inifiles-perl libdaxctl1 libdbi-perl libmariadb3 libmpfr6 libncurses6 libndctl6 libnuma1 libpmem1 libreadline8 libsigsegv2 liburing2 lsof mariadb-client mariadb-client-core mariadb-common mariadb-server mariadb-server-core mysql-common readline-common rsync socat</code></pre>
+
+<p>
+    Pour configurer MariaDB il suffit de lancer la commande <code>mysql_secure_installation</code> et de répondre oui (Y) à toutes les questions. Pour la première question il ne faut rien mettre et faire juste entrée.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mysql_secure_installation</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">NOTE: RUNNING ALL PARTS OF THIS SCRIPT IS RECOMMENDED FOR ALL MariaDB
+    SERVERS IN PRODUCTION USE!  PLEASE READ EACH STEP CAREFULLY!
+
+In order to log into MariaDB to secure it, we'll need the current
+password for the root user. If you've just installed MariaDB, and
+haven't set the root password yet, you should just press enter here.
+
+Enter current password for root (enter for none):
+OK, successfully used password, moving on...
+
+Setting the root password or using the unix_socket ensures that nobody
+can log into the MariaDB root user without the proper authorisation.
+
+You already have your root account protected, so you can safely answer 'n'.
+
+Switch to unix_socket authentication [Y/n] Y
+Enabled successfully!
+Reloading privilege tables..
+... Success!
+
+
+You already have your root account protected, so you can safely answer 'n'.
+
+Change the root password? [Y/n] Y
+New password:
+Re-enter new password:
+Password updated successfully!
+Reloading privilege tables..
+... Success!
+
+
+By default, a MariaDB installation has an anonymous user, allowing anyone
+to log into MariaDB without having to have a user account created for
+them.  This is intended only for testing, and to make the installation
+go a bit smoother.  You should remove them before moving into a
+production environment.
+
+Remove anonymous users? [Y/n] Y
+... Success!
+
+Normally, root should only be allowed to connect from 'localhost'.  This
+ensures that someone cannot guess at the root password from the network.
+
+Disallow root login remotely? [Y/n] Y
+... Success!
+
+By default, MariaDB comes with a database named 'test' that anyone can
+access.  This is also intended only for testing, and should be removed
+before moving into a production environment.
+
+Remove test database and access to it? [Y/n] Y
+- Dropping test database...
+... Success!
+- Removing privileges on test database...
+... Success!
+
+Reloading the privilege tables will ensure that all changes made so far
+will take effect immediately.
+
+Reload privilege tables now? [Y/n] Y
+... Success!
+
+Cleaning up...
+
+All done!  If you've completed all of the above steps, your MariaDB
+installation should now be secure.
+
+Thanks for using MariaDB!</code></pre>
+
+<p>
+    On peut alors se connecter au serveur MariaDB sur le compte <code>root</code> avec la commande
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo mysql -u root -p</code></pre>
+
+<p>
+    On peut alors créer un utilisateur pour chaque service nécessitant une base de donnée. Par exemple si on a besoin d'une base de donnée pour le site <code>gnu.le-site-alice.fr</code> on peut créer l'utilisateur <code>alice-gnu</code> ayant pour mot de passe <code>mot_de_passe_alice_db</code>.
+</p>
+
+<pre class="command-line" data-prompt="MariaDB [(none)]>"><code class="language-bash">CREATE USER 'alice-gnu'@'localhost' IDENTIFIED BY 'mot_de_passe_alice_db';
+GRANT ALL PRIVILEGES ON ParisL1.* TO 'alice-gnu'@'localhost';
+exit;</code></pre>
+
+<p>
+    On peut maintenant se connecter à MariaDB avec l'utilisateur <code>alice-gnu</code> en utilisant la commande <code>sudo mysql -u root -p</code>.
+</p>
+
+<p>
+    On termine en installant le paquet <code>php8.2-mysql</code> permettant aux applications PHP de se connecter aux base de données.
+</p>
+
+<pre class="command-line" data-user="aliceadmin" data-host="webalice"><code class="language-bash">sudo apt install php8.2-mysql</code></pre>
+
+<p>
+    Cela conclut l'installation du serveur Web. Nous avons maintenant un serveur fonctionnel et sécurisé.
+</p>        </div>
+      </div>
+    </div>
+  </article>
+
+  <hr>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-12 col-md-10 mx-auto">
+          <p class="navibar left"><a href="sys_config.html">&#11164; Configuration des outils de base de Debian</a></p>
+          <p class="navibar right"> </p>
+          <p class="navibar center"><a href="contents.html">Sommaire</a></p>
+          <p class="copyright text-muted">Ce document est sous licence <a href="https://creativecommons.org/licenses/by-nc/4.0/legalcode.fr">CC BY-NC 4.0</a> &nbsp; <a href="https://github.com/Mezalor/DebianServer"><img alt="GitHub" src="github.png"></a></p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>

@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="Description complète et détaillée de l'installation et la configuration de Debian 12 sur un serveur ou VPS web avec une attention portée à la sécurité">
+  <meta name="keywords" content="Debian, serveur, installation, configuration, sécurité, web, Bookworm">
+  <meta name="author" content="Mezalor">
+
+  <title>Installation et configuration de Debian 12 sur un serveur</title>
+
+  <link rel="icon" type="image/png" href="fav.png">
+
+  <link href="bootstrap.min.css" rel="stylesheet">
+  <link href="clean-blog.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="prism.css">
+
+  <script src="prism.js"></script>
+
+</head>
+
+<body>
+
+  <header class="masthead" style="background-image: url('debian.avif')">
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-10 mx-auto">
+          <div class="post-heading">
+            <h1>Installation et configuration de Debian 12</h1>
+            <h2 class="subheading"> sur un serveur dédié ou un VPS</h2>
+            <span class="meta">Par
+              <a href="https://github.com/Mezalor">Mezalor</a>
+              le 16 août 2023</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <article>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-12 col-md-20 mx-auto"><h1>Installation de Debian (BIOS)</h1>
+
+<h2 id="autoinstall">Étape 0 : Installation automatique</h2>
+
+<p>
+  Après avoir commandé la location d'un serveur dédié ou d'un VPS, l'installation se fait en général de manière automatique. On peut alors vérifier le matériel et tester les performances du serveur sur cette installation comme présenté dans l'<a href="#appendix">appendice</a>. Dans les parties suivantes on réinstallera complètement le système pour pouvoir configurer plus finement notre système.
+</p>
+
+<p>
+  Si votre hébergeur vous en donne la possibilité, vous pouvez également activer et configurer le pare-feu pour n'autoriser, le temps de la configuration, que votre adresse IP. Vous serez comme ça le seul à avoir accès à votre serveur durant sa configuration.
+</p>
+
+<h2 id="rescue">Étape 1 : Connexion au mode Rescue</h2>
+
+<p>
+  Pour installer Debian sur le serveur, on pourrait simplement utiliser les outils fournis par l’hébergeur via le panel d'administration. L'avantage de cette méthode est la simplicité (en général en 2/3 clics le système est installé). L’inconvénient est qu'on ne maîtrise pas suffisamment l'installation. D'une part certains hébergeurs installent une version modifiée de Debian en rajoutant leurs outils (qu'on ne veut pas forcément) et d'autres ne proposent pas assez de personnalisation lors de l'installation. Par exemple on a rarement le choix du partitionnement.
+  <br><br>
+  Pour ces raisons on va décider d'installer manuellement Debian plutôt que d’utiliser l'installation via le panel de l’hébergeur. Pour cela il faut démarrer le serveur en mode secours (Rescue Mode). Cette option est en général disponible dans le panel de configuration de l'hébergeur (c'est une possibilité souvent proposée par KVM).<br>
+  Un mail sera envoyé avec les identifiants pour se connecter à une petite machine ayant un accès total au disque du serveur. On se connecte alors à cette machine par SSH.
+</p>
+<pre class="command-line" data-user="alice" data-host="home"><code class="language-bash">ssh-keygen -f "/home/alice/.ssh/known_hosts" -R "10.11.12.13"
+ssh root@10.11.12.13</code></pre>
+<pre class="command-line" data-output="1-100"><code class="language-bash">The authenticity of host '10.11.12.13 (10.11.12.13)' can't be established.
+ED25519 key fingerprint is SHA256:kfwAgS98NDwOAPpkfm5uX55vF6J92T7na9DHKd9W/7I.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '10.11.12.13' (ED25519) to the list of known hosts.
+root@10.11.12.13's password:
+Linux vps-b0bca338 4.9.0-11-amd64 #1 SMP Debian 4.9.189-3+deb9u2 (2019-11-11) x86_64
+
+GNU/Linux, to the rescue!
+
+Server:   vps-b0bca338
+Login:    root
+Password: 8agN5cMCU7a2</code></pre>
+
+<h2 id="partitioning">Étape 2 : Partitionnement du disque</h2>
+<p>
+  On commence par déterminer les disques et partitions déjà existante pour trouver le disque du serveur.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue" data-output="2-6"><code class="language-bash">lsblk</code></pre>
+<pre class="command-line" data-output="1-100"><code class="language-bash">NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda      8:16   0  2.5G  0 disk
+└─sda1   8:17   0  2.5G  0 part /
+sdb      8:0    0  100G  0 disk
+└─sdb1   8:1    0  100G  0 part</code></pre>
+
+<p>
+  Ici, au vue de la capacité, le disque du serveur est <code>/dev/sdb</code>.
+</p>
+
+<p>
+  Si on souhaite complètement effacer le disque on peut le remplir de zéro et/ou le remplir par des données aléatoire. A priori cela n'a pas beaucoup d’intérêt et est assez long. Cela peut quand même avoir une utilité pour effacer complètement des données sensibles sur le disque ou lorsque l'on chiffre le disque (ou une partition) pour pas qu'un adversaire puisse savoir la quantité de données chiffrées écrites sur le disque. En résumé cette étape est totalement facultative et prend du temps.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">dd if=/dev/zero of=/dev/sdb status=progress
+dd if=/dev/urandom of=/dev/sdb status=progress</code></pre>
+
+<p>
+  Pour le partitionnement du disque on va choisir une table de partition au format GPT même si le système n'est pas compatible <code>UEFI</code>. Il faudra donc créer une partition spéciale « BIOS Boot » au début du disque pour permettre à <code>GRUB</code> de stocker des données sans risque d'écraser la table <code>GPT</code>. Pour plus de détails sur cette partition voir <a href="https://www.gnu.org/software/grub/manual/grub/html_node/BIOS-installation.html#BIOS-installation">ici</a> et <a href="https://wiki.archlinux.org/title/GRUB#GUID_Partition_Table_(GPT)_specific_instructions">là</a>.<br>
+  On suppose dans cet exemple disposer d'un disque dur de 100 Gio. On partitionne ainsi notre disque dur.
+</p>
+<table>
+  <tr>
+    <th>Description</th>
+    <th>Taille</th>
+    <th>Système de fichiers</th>
+    <th>Options de montage</th>
+    <th>Code gdisk (GUID)</th>
+  </tr>
+  <tr>
+    <td>BIOS Boot Partition</td>
+    <td>1 Mio</td>
+    <td></td>
+    <td></td>
+    <td style="text-align: center;"><abbr title="21686148-6449-6E6F-744E-656564454649">ef02</abbr></td>
+  </tr>
+  <tr>
+    <td>/boot</td>
+    <td>200 Mio</td>
+    <td>ext4</td>
+    <td>noauto</td>
+    <td style="text-align: center;"><abbr title="BC13C2FF-59E6-4262-A352-B275FD6F7172">ea00</abbr></td>
+  </tr>
+  <tr>
+    <td>/</td>
+    <td>3 Gio</td>
+    <td>ext4</td>
+    <td></td>
+    <td style="text-align: center;"><abbr title="4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709">8304</abbr></td>
+  </tr>
+  <tr>
+    <td>/var</td>
+    <td>3 Gio</td>
+    <td>ext4</td>
+    <td>nosuid, nodev, noexec</td>
+    <td style="text-align: center;"><abbr title="4D21B016-B534-45C2-A9FB-5C16E091FD2D">8310</abbr></td>
+  </tr>
+  <tr>
+    <td>/var/log</td>
+    <td>10 Gio</td>
+    <td>ext4</td>
+    <td>nosuid, nodev, noexec</td>
+    <td style="text-align: center;"><abbr title="0FC63DAF-8483-4772-8E79-3D69D8477DE4">8300</abbr></td>
+  </tr>
+  <tr>
+    <td>/usr</td>
+    <td>5 Gio</td>
+    <td>ext4</td>
+    <td>nodev</td>
+    <td style="text-align: center;"><abbr title="0FC63DAF-8483-4772-8E79-3D69D8477DE4">8300</abbr></td>
+  </tr>
+  <tr>
+    <td>/opt</td>
+    <td>2 Gio</td>
+    <td>ext4</td>
+    <td>nosuid, nodev</td>
+    <td style="text-align: center;"><abbr title="0FC63DAF-8483-4772-8E79-3D69D8477DE4">8300</abbr></td>
+  </tr>
+  <tr>
+    <td>/home</td>
+    <td>10 Gio</td>
+    <td>ext4</td>
+    <td>nosuid, nodev, noexec</td>
+    <td style="text-align: center;"><abbr title="933AC7E1-2EB4-4F13-B844-0E14E2AEF915">8302</abbr></td>
+  </tr>
+  <tr>
+    <td>/tmp</td>
+    <td></td>
+    <td>tmpfs</td>
+    <td>nosuid, nodev, noexec</td>
+    <td style="text-align: center;"></td>
+  </tr>
+  <tr>
+    <td>SWAP</td>
+    <td>4 Gio</td>
+    <td>swap</td>
+    <td></td>
+    <td style="text-align: center;"><abbr title="0657FD6D-A4AB-43C4-84E5-0933C84B4F4F">8200</abbr></td>
+  </tr>
+  <tr>
+    <td>LUKS</td>
+    <td>~ 60 Gio</td>
+    <td>luks - ext4</td>
+    <td>nosuid, nodev, noexec</td>
+    <td style="text-align: center;"><abbr title="CA7D7CCB-63ED-4C53-861C-1742536059CC">8309</abbr></td>
+  </tr>
+</table>
+
+<p>
+  C'est pour une question de sécurité qu'on décide de faire autant de partition. D'une part cela protège le système de la saturation du disque. Par exemple une attaque DDOS pourrait remplir le répertoire <code>/var/log</code> qui, s'il était sur la même partition que la racine, pourrait rendre le système peu utilisable (voir <a href="https://access.redhat.com/discussions/641923">ici</a>). D'autre part cela permet d'utiliser des options de montage différents pour chaque partition <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">[ANSSI R28]</a>.
+</p>
+<p>
+  Pour plus de souplesse on pourrait utiliser LVM qui permettrait de modifier simplement la taille des partitions si on s’apercevait, durant l'utilisation du serveur, que certaines partitions sont trop petites ou trop grandes. Ce n'est pas le choix fait ici puisque cela rajouterait une couche logiciel ce qu'on essaye d'éviter par le principe de minimisation. De plus le partitionnement proposé a prouvé son efficacité pour l'utilisation souhaité du serveur. Finalement si on dispose d'une grande quantité d'espace disque, on peut également laisser de l'espace entre chaque partition dans le cas où l'on souhaiterait en agrandir certaine par la suite.
+</p>
+<p>
+  La dernière partition de 60 Gio sera une partition chiffrée sur laquelle on mettra les données de la partie serveur de stockage ainsi que les données personnelles des utilisateurs des sites web.<br>
+  On pourrait aussi décider de chiffrer complètement tout le système et de ne laisser que la partition <code>/boot</code> en clair. Le démarrage sur la partition chiffrée se ferait via KVM. Ici ce n'est pas le choix qui est fait car en cas de redémarrage intempestif on veut que le serveur web soit opérationnel sans intervention humaine. De plus le chiffrement du système pourrait réduire les performances du serveur.
+</p>
+<p>
+  Pour le partitionnement on choisit l'outil <code>gdisk</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">gdisk /dev/sdb</code></pre>
+<pre class="command-line" data-output="1-100"><code class="language-bash">GPT fdisk (gdisk) version 1.0.5
+
+Partition table scan:
+  MBR: protective
+  BSD: not present
+  APM: not present
+  GPT: present
+
+Found valid GPT with protective MBR; using GPT.
+
+Command (? for help):</code></pre>
+
+<p>
+  On commence par créer une nouvelle table de partition GPT avec la commande <code>o</code>. Ensuite pour créer une nouvelle partition on utilise la commande <code>n</code>. Pour chaque nouvelle partition il faudra indiquer sa position de début et de fin sur le disque. Par défaut il faut indiquer des positions absolues mais on peut utiliser des positions relatives avec les symbole <code>+</code> et <code>-</code>. Par exemple pour commencer une nouvelle partition de taille 12 Gio à 500 Mio de la précédente il faut utiliser <code>+500M</code> puis <code>+12G</code>. L'outil <code>gdisk</code> vérifie l'alignement des partitions. Il faudra ensuite indiquer le type de la partition (c'est-à-dire son GUID). Pour plus de détails voir <a href="https://wiki.archlinux.org/title/GPT_fdisk">ici</a>.
+</p>
+
+<p>
+  Voici la liste des commandes pour effectuer le partitionnement proposé précédemment.
+</p>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Command (? for help): o
+This option deletes all partitions and creates a new protective MBR.
+Proceed? (Y/N): Y
+
+Command (? for help): n
+Partition number (1-128, default 1):
+First sector (34-209715156, default = 2048) or {+-}size{KMGTP}:
+Last sector (2048-209715156, default = 209715156) or {+-}size{KMGTP}: +1M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ef02
+Changed type of partition to 'BIOS boot partition'
+
+Command (? for help): n
+Partition number (2-128, default 2):
+First sector (34-209715156, default = 4096) or {+-}size{KMGTP}:
+Last sector (4096-209715156, default = 209715156) or {+-}size{KMGTP}: +200M
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): ea00
+Changed type of partition to 'Freedesktop $BOOT'
+
+Command (? for help): n
+Partition number (3-128, default 3):
+First sector (34-209715156, default = 413696) or {+-}size{KMGTP}:
+Last sector (413696-209715156, default = 209715156) or {+-}size{KMGTP}: +3G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8304
+Changed type of partition to 'Linux x86-64 root (/)'
+
+Command (? for help): n
+Partition number (4-128, default 4):
+First sector (34-209715156, default = 6705152) or {+-}size{KMGTP}:
+Last sector (6705152-209715156, default = 209715156) or {+-}size{KMGTP}: +3G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8310
+Changed type of partition to 'Linux /var'
+
+Command (? for help): n
+Partition number (5-128, default 5):
+First sector (34-209715156, default = 12996608) or {+-}size{KMGTP}:
+Last sector (12996608-209715156, default = 209715156) or {+-}size{KMGTP}: +10G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (6-128, default 6):
+First sector (34-209715156, default = 33968128) or {+-}size{KMGTP}:
+Last sector (33968128-209715156, default = 209715156) or {+-}size{KMGTP}: +5G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (7-128, default 7):
+First sector (34-209715156, default = 44453888) or {+-}size{KMGTP}:
+Last sector (44453888-209715156, default = 209715156) or {+-}size{KMGTP}: +2G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8300
+Changed type of partition to 'Linux filesystem'
+
+Command (? for help): n
+Partition number (8-128, default 8):
+First sector (34-209715156, default = 48648192) or {+-}size{KMGTP}:
+Last sector (48648192-209715156, default = 209715156) or {+-}size{KMGTP}: +10G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8302
+Changed type of partition to 'Linux /home'
+
+Command (? for help): n
+Partition number (9-128, default 9):
+First sector (34-209715156, default = 69619712) or {+-}size{KMGTP}:
+Last sector (69619712-209715156, default = 209715156) or {+-}size{KMGTP}: +4G
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8200
+Changed type of partition to 'Linux swap'
+
+Command (? for help): n
+Partition number (10-128, default 10):
+First sector (34-209715156, default = 78008320) or {+-}size{KMGTP}:
+Last sector (78008320-209715156, default = 209715156) or {+-}size{KMGTP}:
+Current type is 8300 (Linux filesystem)
+Hex code or GUID (L to show codes, Enter = 8300): 8309
+Changed type of partition to 'Linux LUKS'</code></pre>
+
+<p>
+  On peut alors afficher un résumé des opérations de partitionnement prévues avec la commande <code>p</code> avant d'écrire définitivement ces opérations sur le disque avec la commande <code>w</code>.
+</p>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Command (? for help): p
+Disk /dev/sdb: 209715200 sectors, 100.0 GiB
+Model: QEMU HARDDISK
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): 918612B4-0EB0-43DD-9494-63FDB36A49DA
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 209715156
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 2014 sectors (1007.0 KiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048            4095   1024.0 KiB  EF02  BIOS boot partition
+   2            4096          413695   200.0 MiB   EA00  Freedesktop $BOOT
+   3          413696         6705151   3.0 GiB     8304  Linux x86-64 root (/)
+   4         6705152        12996607   3.0 GiB     8310  Linux /var
+   5        12996608        33968127   10.0 GiB    8300  Linux filesystem
+   6        33968128        44453887   5.0 GiB     8300  Linux filesystem
+   7        44453888        48648191   2.0 GiB     8300  Linux filesystem
+   8        48648192        69619711   10.0 GiB    8302  Linux /home
+   9        69619712        78008319   4.0 GiB     8200  Linux swap
+  10        78008320       209715156   62.8 GiB    8309  Linux LUKS
+
+Command (? for help): w
+
+Final checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING
+PARTITIONS!!
+
+Do you want to proceed? (Y/N): Y
+OK; writing new GUID partition table (GPT) to /dev/sdb.
+The operation has completed successfully.</code></pre>
+
+<p>
+  Voilà, le partitionnement est maintenant terminé. Parfois il faudra redémarrer le mode rescue pour que le système prenne en compte le changement de table de partition. On peut vérifier que tout s'est bien passé.
+</p>
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">lsblk</code></pre>
+<pre class="command-line" data-output="1-100"><code class="language-bash">NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda      8:16   0   2.5G  0 disk
+└─sda1   8:17   0   2.5G  0 part /
+sdb      8:0    0   100G  0 disk
+├─sdb1   8:1    0     1M  0 part
+├─sdb2   8:2    0   200M  0 part
+├─sdb3   8:3    0     3G  0 part
+├─sdb4   8:4    0     3G  0 part
+├─sdb5   8:5    0    10G  0 part
+├─sdb6   8:6    0     5G  0 part
+├─sdb7   8:7    0     2G  0 part
+├─sdb8   8:8    0    10G  0 part
+├─sdb9   8:9    0     4G  0 part
+└─sdb10  8:10   0  62.8G  0 part</code></pre>
+
+<p>
+  Il faut maintenant formater les partitions. On a fait le choix ici de formater en <code>ext4</code> plutôt qu'en <code>Btfrs</code> pour la stabilité et les performances. Cependant les fonctionnalités du système de fichiers <code>Btrfs</code> nous auraient par exemple éviter le partitionnement précédent grâce aux sous-volumes.
+</p>
+<p>
+  Lors de lu formatage d'une partition en <code>ext4</code> on peut jouer sur deux paramètres pour gagner un peu de place. Le nombre d'inode avec le paramètre <code>-i</code> et le pourcentage de blocs réservés (pour root en cas de saturation du disque) avec le paramètre <code>-m</code>. Pour plus de détails voir <a href="https://wiki.archlinux.org/title/Ext4_(Fran%C3%A7ais)">ici</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">mkfs.ext4 -m 0 /dev/sdb2
+mkfs.ext4 /dev/sdb3
+mkfs.ext4 /dev/sdb4
+mkfs.ext4 /dev/sdb5
+mkfs.ext4 -i 4096 /dev/sdb6
+mkfs.ext4 -m 1 /dev/sdb7
+mkfs.ext4 -m 1 /dev/sdb8
+mkswap /dev/sdb9</code></pre>
+
+<p>
+  On formatera la partition LUKS une fois le système installé.
+</p>
+
+<h2 id="debootstrap">Étape 3 : Installation de Debian avec <code>debootstrap</code></h2>
+
+<p>
+  Pour installer Debian on va utiliser un petit utilitaire nommé <code>debootstrap</code> et conçu par l'équipe <a href="https://wiki.debian.org/fr/DebianInstaller/Team">DebianInstaller</a>. Pour plus d'informations sur son utilisation vous pouvez vous référer au <a href="https://www.debian.org/releases/bookworm/amd64/apds03.fr.html">manuel d'installation de Debian</a>  ou à ce <a href="https://gist.github.com/varqox/42e213b6b2dde2b636ef">HOWTO</a>.<br>
+  Pour télécharger et installer <code>debootstrap</code> il faut se rendre sur <a href="https://ftp.debian.org/debian/pool/main/d/debootstrap/">cette page</a> pour noter la dernière version. Ensuite on télécharge et on installe le paquet.
+</p>
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">wget https://deb.debian.org/debian/pool/main/d/debootstrap/debootstrap_1.0.128+nmu5_all.deb
+dpkg -i debootstrap_*.*.*_all.deb</code></pre>
+
+<p>
+  De manière facultative (par sécurité) on peut utiliser la clef de l'archive Debian 12 pour vérifier sa signature lors de l'installation avec <code>debootstrap</code>. Pour cela on va la télécharger sur ce <a href="https://ftp-master.debian.org/keys.html">site</a> et convertir le fichier texte <code>release-12.asc</code> en fichier binaire au format <code>.gpg</code>.
+</p>
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">wget https://ftp-master.debian.org/keys/release-12.asc
+gpg --dearmor release-12.asc</code></pre>
+<p>
+    On commence par monter la partition racine dans le <code>/mnt</code> du système de secours. On créer alors une structure de dossiers pour monter toutes nos partitions.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">mount /dev/sdb3 /mnt/
+mkdir -p /mnt/{boot,home,opt,tmp,usr,var}
+mount /dev/sdb2 /mnt/boot
+mount /dev/sdb4 /mnt/var
+mount /dev/sdb6 /mnt/usr
+mount /dev/sdb7 /mnt/opt
+mount /dev/sdb8 /mnt/home
+mkdir -p /mnt/var/log
+mount /dev/sdb5 /mnt/var/log</code></pre>
+
+<p>
+  On finit par installer une version (très) minimale de Debian dans <code>/mnt</code> à l'aide de <code>debootstrap</code>. On y ajoute les paquets <code>openssl</code> et <code>ca-certificates</code> pour pouvoir utiliser apt avec <code>https</code> sans soucis. Plus précisément le paquet <code>openssl</code> fournit les outils qui implémentent des protocoles cryptographiques SSL et TLS pour communiquer de façon sécurisée sur internet et le paquet <code>ca-certificates</code> inclut les autorités de certifications livrées avec les navigateurs Mozilla afin de permettre aux applications basées sur SSL de vérifier l'authenticité des connexions SSL (il est suggéré par <code>openssl</code>).<br>
+  On décide ici de vérifier la signature de l'archive avec la clef <code>release-12.asc.gpg</code>. Si vous n'avez pas téléchargé la clef il faut enlever le paramètre <code>--keyring=./release-12.asc.gpg</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">debootstrap --keyring=./release-12.asc.gpg --arch=amd64 --variant=minbase --include=libssl3,openssl,ca-certificates bookworm /mnt http://deb.debian.org/debian/</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">I: Retrieving InRelease
+I: Checking Release signature
+I: Valid Release signature (key id 4D64FEC119C2029067D6E791F8D2585B8783D481)
+I: Retrieving Packages
+I: Validating Packages
+I: Resolving dependencies of required packages...
+I: Resolving dependencies of base packages...
+I: Checking component main on http://deb.debian.org/debian...
+I: Retrieving adduser 3.134
+I: Validating adduser 3.134
+[...]
+I: Chosen extractor for .deb packages: dpkg-deb
+I: Extracting adduser...
+[...]
+I: Installing core packages...
+I: Unpacking required packages...
+I: Unpacking adduser...
+[...]
+I: Configuring required packages...
+I: Configuring debian-archive-keyring...
+[...]
+I: Unpacking the base system...
+I: Base system installed successfully.</code></pre>
+
+<h2 id="chroot">Étape 4 : Chroot</h2>
+
+<p>
+    Debian est maintenant installé sur le serveur mais en version très minimale. Il est encore trop tôt pour pouvoir démarrer le serveur et s'y connecter via SSH. Il faut, avant, configurer le système pour avoir un serveur un minimum fonctionnel. Pour cela on va « <a href="https://wiki.archlinux.org/title/Chroot_(Fran%C3%A7ais)">chrooter</a> » le serveur sur la machine rescue c'est-à-dire en quelques sortes faire croire à la machine rescue qu'elle tourne sur le serveur et qu'elle a pour racine la racine du systeme qu'on vient d'installer sur le serveur (ici cela se passe dans le répertoire <code>/mnt</code>).<br>
+    On commence par monter/bind les répertoires <code>/proc</code>, <code>/sys</code> et <code>/dev</code> sur le serveur et on chroot le repertoire <code>/mnt</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">swapon /dev/sdb9
+mount -t proc /proc /mnt/proc/
+mount -t sysfs /sys /mnt/sys/
+mount --rbind /dev /mnt/dev/
+chroot /mnt /bin/bash</code></pre>
+
+<p>
+  On commence par définir les bons droits du dossier <code>/tmp</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">chmod 1777 /tmp</code></pre>
+
+<p>
+  On va vouloir installer un certain nombre de paquets pour compléter l'installation. Or la politique de Debian stipule que les paquets fournissant des services système doivent démarrer ces services par défaut. Afin d'éviter que des services ne démarrent, on va créer un script <code>policy-rc.d</code> que l'on supprimera plus tard. Pour plus d'information voir ce <a href="https://jpetazzo.github.io/2013/10/06/policy-rc-d-do-not-start-services-automatically/">document</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue" data-output="2-4"><code class="language-bash">cat &gt; /usr/sbin/policy-rc.d &lt;&lt;EOF
+#!/bin/sh
+exit 101
+EOF
+chmod +x /usr/sbin/policy-rc.d</code></pre>
+
+<h2 id="apt">Étape 5 : Configuration des dépôts</h2>
+
+<p>
+  On configure maintenant les dépôts Debian en éditant le fichier <code>/etc/apt/sources.list</code> (voir <a href="https://manpages.debian.org/bookworm/apt/sources.list.5.fr.html">man</a>) afin de pouvoir installer et mettre à jour les paquets. <br>
+  On choisit les dépôts : <a href="https://www.debian.org/security">bookworm-security</a>, <a href="https://wiki.debian.org/fr/DebianStable">bookworm</a> et <a href="https://wiki.debian.org/fr/StableUpdates">bookworm-updates</a>.<br>
+  Pour chaque dépôt on utilisera seulement les composants de la section <code>main</code> (n'ayant pas de soucis de pilote, on n'a pas besoin ici des composants de <code>contrib</code> et <code>non-free</code>). Pour plus de détails voir <a href="https://wiki.debian.org/fr/SourcesList">ici</a>.<br>
+  Dernière chose dans la configuration de <code>sources.list</code> : l'utilisation ou non de <code>https</code>. C'est quelque chose qui ne fait pas encore un large consensus (voir <a href="https://justi.cz/security/2019/01/22/apt-rce.html">ici</a> et <a href="https://guardianproject.info/2021/12/08/debian-over-https/">là</a>). On fera le choix d'utiliser <code>https</code>.<br>
+  Concernant la gestion des dépendances : chaque paquet peut avoir des relations de dépendance avec d'autres paquets. Ces relations sont essentiellement symbolisées par les drapeaux <code>Depends</code> lorsque la dépendance est nécessaire, <code>Recommends</code> lorsque la dépendance est recommandée et <code>Suggests</code> lorsque la dépendance est suggérée. Pour plus d'informations on peut se référer à cette <a href="https://www.debian.org/doc/manuals/debian-faq/pkg-basics.fr.html#depends">FAQ</a> ou au <a href="https://www.debian.org/doc/debian-policy/ch-relationships.html#binary-dependencies-depends-recommends-suggests-enhances-pre-depends">à la politique de Debian</a>. Par défaut <code>apt</code> installe les dépendances recommandées. Pour satisfaire le principe de minimisation, on choisit ici de ne pas installer les paquets suggérés et recommandés.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue" data-output="2-5,7-9"><code class="language-bash">cat &gt; /etc/apt/sources.list &lt;&lt;EOF
+deb https://security.debian.org/debian-security bookworm-security main
+deb https://deb.debian.org/debian bookworm main
+deb https://deb.debian.org/debian bookworm-updates main
+EOF
+cat &gt; /etc/apt/apt.conf.d/60recommends &lt;&lt;EOF
+APT::Install-Recommends "0";
+APT::Install-Suggests "0";
+EOF</code></pre>
+
+<p>
+  On peut maintenant mettre à jour la liste des paquets et le système (qui devrait déjà être à jour) en faisant :
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt update
+apt full-upgrade</code></pre>
+
+<h2 id="locale">Étape 6 : Paramètres régionaux et éditeur de texte</h2>
+
+<p>
+  On va maintenant configurer les paramètres régionaux du système (<a href="https://wiki.debian.org/Locale">Locales</a>) pour en particulier mettre le système en français. Pour cela on commence par installer le paquet <code>locales</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install locales</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">The following NEW packages will be installed:
+  libc-l10n locales</code></pre>
+
+<p>
+  Puis on configure les langues et paramètres régionaux souhaités. Ici on choisit <code>en_US@UTF8</code> et <code>fr_FR@UTF-8</code> et on n'indique pas de langue par défaut (<code>None</code>) pour laisser le choix aux utilisateurs via SSH.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">dpkg-reconfigure locales</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Configuring locales
+-------------------
+
+Locales are a framework to switch between multiple languages and allow users to use their language, country, characters, collation order, etc.
+
+Please choose which locales to generate. UTF-8 locales should be chosen by default, particularly for new installations. Other character sets may be useful for backwards compatibility with older systems and
+software.
+
+  1. All locales          47. bn_IN UTF-8           93. en_NZ.UTF-8 UTF-8   139. ga_IE.UTF-8 UTF-8       185. lij_IT UTF-8        231. pap_AW UTF-8            277. ta_LK UTF-8
+  2. aa_DJ.UTF-8 UTF-8    48. bo_CN UTF-8           94. en_PH.UTF-8 UTF-8   140. gd_GB.UTF-8 UTF-8       186. ln_CD UTF-8         232. pap_CW UTF-8            278. tcy_IN.UTF-8 UTF-8
+  3. aa_ER UTF-8          49. bo_IN UTF-8           95. en_SC.UTF-8 UTF-8   141. gez_ER UTF-8            187. lo_LA UTF-8         233. pl_PL.UTF-8 UTF-8       279. te_IN UTF-8
+  4. aa_ER@saaho UTF-8    50. br_FR.UTF-8 UTF-8     96. en_SG.UTF-8 UTF-8   142. gez_ER@abegede UTF-8    188. lt_LT.UTF-8 UTF-8   234. ps_AF UTF-8             280. tg_TJ.UTF-8 UTF-8
+  5. aa_ET UTF-8          51. brx_IN UTF-8          97. en_US.UTF-8 UTF-8   143. gez_ET UTF-8            189. lv_LV.UTF-8 UTF-8   235. pt_BR.UTF-8 UTF-8       281. th_TH.UTF-8 UTF-8
+  6. af_ZA.UTF-8 UTF-8    52. bs_BA.UTF-8 UTF-8     98. en_ZA.UTF-8 UTF-8   144. gez_ET@abegede UTF-8    190. lzh_TW UTF-8        236. pt_PT.UTF-8 UTF-8       282. the_NP UTF-8
+  7. agr_PE UTF-8         53. byn_ER UTF-8          99. en_ZM UTF-8         145. gl_ES.UTF-8 UTF-8       191. mag_IN UTF-8        237. quz_PE UTF-8            283. ti_ER UTF-8
+  8. ak_GH UTF-8          54. ca_AD.UTF-8 UTF-8     100. en_ZW.UTF-8 UTF-8  146. gu_IN UTF-8             192. mai_IN UTF-8        238. raj_IN UTF-8            284. ti_ET UTF-8
+  9. am_ET UTF-8          55. ca_ES.UTF-8 UTF-8     101. eo UTF-8           147. gv_GB.UTF-8 UTF-8       193. mai_NP UTF-8        239. rif_MA UTF-8            285. tig_ER UTF-8
+  10. an_ES.UTF-8 UTF-8   56. ca_ES@valencia UTF-8  102. es_AR.UTF-8 UTF-8  148. ha_NG UTF-8             194. mfe_MU UTF-8        240. ro_RO.UTF-8 UTF-8       286. tk_TM UTF-8
+  11. anp_IN UTF-8        57. ca_FR.UTF-8 UTF-8     103. es_BO.UTF-8 UTF-8  149. hak_TW UTF-8            195. mg_MG.UTF-8 UTF-8   241. ru_RU.UTF-8 UTF-8       287. tl_PH.UTF-8 UTF-8
+  12. ar_AE.UTF-8 UTF-8   58. ca_IT.UTF-8 UTF-8     104. es_CL.UTF-8 UTF-8  150. he_IL.UTF-8 UTF-8       196. mhr_RU UTF-8        242. ru_UA.UTF-8 UTF-8       288. tn_ZA UTF-8
+  13. ar_BH.UTF-8 UTF-8   59. ce_RU UTF-8           105. es_CO.UTF-8 UTF-8  151. hi_IN UTF-8             197. mi_NZ.UTF-8 UTF-8   243. rw_RW UTF-8             289. to_TO UTF-8
+  14. ar_DZ.UTF-8 UTF-8   60. chr_US UTF-8          106. es_CR.UTF-8 UTF-8  152. hif_FJ UTF-8            198. miq_NI UTF-8        244. sa_IN UTF-8             290. tpi_PG UTF-8
+  15. ar_EG.UTF-8 UTF-8   61. ckb_IQ UTF-8          107. es_CU UTF-8        153. hne_IN UTF-8            199. mjw_IN UTF-8        245. sah_RU UTF-8            291. tr_CY.UTF-8 UTF-8
+  16. ar_IN UTF-8         62. cmn_TW UTF-8          108. es_DO.UTF-8 UTF-8  154. hr_HR.UTF-8 UTF-8       200. mk_MK.UTF-8 UTF-8   246. sat_IN UTF-8            292. tr_TR.UTF-8 UTF-8
+  17. ar_IQ.UTF-8 UTF-8   63. crh_UA UTF-8          109. es_EC.UTF-8 UTF-8  155. hsb_DE.UTF-8 UTF-8      201. ml_IN UTF-8         247. sc_IT UTF-8             293. ts_ZA UTF-8
+  18. ar_JO.UTF-8 UTF-8   64. cs_CZ.UTF-8 UTF-8     110. es_ES.UTF-8 UTF-8  156. ht_HT UTF-8             202. mn_MN UTF-8         248. sd_IN UTF-8             294. tt_RU UTF-8
+  19. ar_KW.UTF-8 UTF-8   65. csb_PL UTF-8          111. es_GT.UTF-8 UTF-8  157. hu_HU.UTF-8 UTF-8       203. mni_IN UTF-8        249. sd_IN@devanagari UTF-8  295. tt_RU@iqtelif UTF-8
+  20. ar_LB.UTF-8 UTF-8   66. cv_RU UTF-8           112. es_HN.UTF-8 UTF-8  158. hy_AM UTF-8             204. mnw_MM UTF-8        250. se_NO UTF-8             296. ug_CN UTF-8
+  21. ar_LY.UTF-8 UTF-8   67. cy_GB.UTF-8 UTF-8     113. es_MX.UTF-8 UTF-8  159. ia_FR UTF-8             205. mr_IN UTF-8         251. sgs_LT UTF-8            297. uk_UA.UTF-8 UTF-8
+  22. ar_MA.UTF-8 UTF-8   68. da_DK.UTF-8 UTF-8     114. es_NI.UTF-8 UTF-8  160. id_ID.UTF-8 UTF-8       206. ms_MY.UTF-8 UTF-8   252. shn_MM UTF-8            298. unm_US UTF-8
+  23. ar_OM.UTF-8 UTF-8   69. de_AT.UTF-8 UTF-8     115. es_PA.UTF-8 UTF-8  161. ig_NG UTF-8             207. mt_MT.UTF-8 UTF-8   253. shs_CA UTF-8            299. ur_IN UTF-8
+  24. ar_QA.UTF-8 UTF-8   70. de_BE.UTF-8 UTF-8     116. es_PE.UTF-8 UTF-8  162. ik_CA UTF-8             208. my_MM UTF-8         254. si_LK UTF-8             300. ur_PK UTF-8
+  25. ar_SA.UTF-8 UTF-8   71. de_CH.UTF-8 UTF-8     117. es_PR.UTF-8 UTF-8  163. is_IS.UTF-8 UTF-8       209. nan_TW UTF-8        255. sid_ET UTF-8            301. uz_UZ.UTF-8 UTF-8
+  26. ar_SD.UTF-8 UTF-8   72. de_DE.UTF-8 UTF-8     118. es_PY.UTF-8 UTF-8  164. it_CH.UTF-8 UTF-8       210. nan_TW@latin UTF-8  256. sk_SK.UTF-8 UTF-8       302. uz_UZ@cyrillic UTF-8
+  27. ar_SS UTF-8         73. de_IT.UTF-8 UTF-8     119. es_SV.UTF-8 UTF-8  165. it_IT.UTF-8 UTF-8       211. nb_NO.UTF-8 UTF-8   257. sl_SI.UTF-8 UTF-8       303. ve_ZA UTF-8
+  28. ar_SY.UTF-8 UTF-8   74. de_LI.UTF-8 UTF-8     120. es_US.UTF-8 UTF-8  166. iu_CA UTF-8             212. nds_DE UTF-8        258. sm_WS UTF-8             304. vi_VN UTF-8
+  29. ar_TN.UTF-8 UTF-8   75. de_LU.UTF-8 UTF-8     121. es_UY.UTF-8 UTF-8  167. ja_JP.UTF-8 UTF-8       213. nds_NL UTF-8        259. so_DJ.UTF-8 UTF-8       305. wa_BE.UTF-8 UTF-8
+  30. ar_YE.UTF-8 UTF-8   76. doi_IN UTF-8          122. es_VE.UTF-8 UTF-8  168. ka_GE.UTF-8 UTF-8       214. ne_NP UTF-8         260. so_ET UTF-8             306. wae_CH UTF-8
+  31. as_IN UTF-8         77. dsb_DE UTF-8          123. et_EE.UTF-8 UTF-8  169. kab_DZ UTF-8            215. nhn_MX UTF-8        261. so_KE.UTF-8 UTF-8       307. wal_ET UTF-8
+  32. ast_ES.UTF-8 UTF-8  78. dv_MV UTF-8           124. eu_ES.UTF-8 UTF-8  170. kk_KZ.UTF-8 UTF-8       216. niu_NU UTF-8        262. so_SO.UTF-8 UTF-8       308. wo_SN UTF-8
+  33. ayc_PE UTF-8        79. dz_BT UTF-8           125. eu_FR.UTF-8 UTF-8  171. kl_GL.UTF-8 UTF-8       217. niu_NZ UTF-8        263. sq_AL.UTF-8 UTF-8       309. xh_ZA.UTF-8 UTF-8
+  34. az_AZ UTF-8         80. el_CY.UTF-8 UTF-8     126. fa_IR UTF-8        172. km_KH UTF-8             218. nl_AW UTF-8         264. sq_MK UTF-8             310. yi_US.UTF-8 UTF-8
+  35. az_IR UTF-8         81. el_GR.UTF-8 UTF-8     127. ff_SN UTF-8        173. kn_IN UTF-8             219. nl_BE.UTF-8 UTF-8   265. sr_ME UTF-8             311. yo_NG UTF-8
+  36. be_BY.UTF-8 UTF-8   82. en_AG UTF-8           128. fi_FI.UTF-8 UTF-8  174. ko_KR.UTF-8 UTF-8       220. nl_NL.UTF-8 UTF-8   266. sr_RS UTF-8             312. yue_HK UTF-8
+  37. be_BY@latin UTF-8   83. en_AU.UTF-8 UTF-8     129. fil_PH UTF-8       175. kok_IN UTF-8            221. nn_NO.UTF-8 UTF-8   267. sr_RS@latin UTF-8       313. yuw_PG UTF-8
+  38. bem_ZM UTF-8        84. en_BW.UTF-8 UTF-8     130. fo_FO.UTF-8 UTF-8  176. ks_IN UTF-8             222. nr_ZA UTF-8         268. ss_ZA UTF-8             314. zh_CN.UTF-8 UTF-8
+  39. ber_DZ UTF-8        85. en_CA.UTF-8 UTF-8     131. fr_BE.UTF-8 UTF-8  177. ks_IN@devanagari UTF-8  223. nso_ZA UTF-8        269. st_ZA.UTF-8 UTF-8       315. zh_HK.UTF-8 UTF-8
+  40. ber_MA UTF-8        86. en_DK.UTF-8 UTF-8     132. fr_CA.UTF-8 UTF-8  178. ku_TR.UTF-8 UTF-8       224. oc_FR.UTF-8 UTF-8   270. sv_FI.UTF-8 UTF-8       316. zh_SG.UTF-8 UTF-8
+  41. bg_BG.UTF-8 UTF-8   87. en_GB.UTF-8 UTF-8     133. fr_CH.UTF-8 UTF-8  179. kw_GB.UTF-8 UTF-8       225. om_ET UTF-8         271. sv_SE.UTF-8 UTF-8       317. zh_TW.UTF-8 UTF-8
+  42. bhb_IN.UTF-8 UTF-8  88. en_HK.UTF-8 UTF-8     134. fr_FR.UTF-8 UTF-8  180. ky_KG UTF-8             226. om_KE.UTF-8 UTF-8   272. sw_KE UTF-8             318. zu_ZA.UTF-8 UTF-8
+  43. bho_IN UTF-8        89. en_IE.UTF-8 UTF-8     135. fr_LU.UTF-8 UTF-8  181. lb_LU UTF-8             227. or_IN UTF-8         273. sw_TZ UTF-8
+[More]
+
+  44. bho_NP UTF-8        90. en_IL UTF-8           136. fur_IT UTF-8       182. lg_UG.UTF-8 UTF-8       228. os_RU UTF-8         274. syr UTF-8
+  45. bi_VU UTF-8         91. en_IN UTF-8           137. fy_DE UTF-8        183. li_BE UTF-8             229. pa_IN UTF-8         275. szl_PL UTF-8
+  46. bn_BD UTF-8         92. en_NG UTF-8           138. fy_NL UTF-8        184. li_NL UTF-8             230. pa_PK UTF-8         276. ta_IN UTF-8
+
+(Enter the items or ranges you want to select, separated by spaces.)
+
+Locales to be generated: 97 134
+
+Many packages in Debian use locales to display text in the correct language for the user. You can choose a default locale for the system from the generated locales.
+
+This will select the default language for the entire system. If this system is a multi-user system where not all users are able to speak the default language, they will experience difficulties.
+
+  1. None  2. C.UTF-8  3. en_US.UTF-8  4. fr_FR.UTF-8
+Default locale for the system environment: 1
+
+Generating locales (this might take a while)...
+  en_US.UTF-8... done
+  fr_FR.UTF-8... done
+Generation complete.</code></pre>
+
+<p>
+  On installe enfin <code>nano</code> un éditeur de texte en ligne de commande qui nous sera bien utile pour éditer les fichiers de configuration. Il faudra savoir utiliser cet éditeur. Les deux commandes de base sont <code>Ctrl + S</code> pour enregistrer un fichier et <code>Ctrl + X</code> pour quitter l'éditeur. Pour plus de détails voir cette <a href="https://debian-facile.org/doc:editeurs:nano">documentation</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install nano</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Suggested packages:
+  hunspell
+Recommended packages:
+  libgpm2
+The following NEW packages will be installed:
+  libncursesw6 nano</code></pre>
+
+<h2 id="fstab">Étape 7 : Édition du fichier fstab</h2>
+
+<p>
+  Le fichier <code>/etc/fstab</code> définit le point et les options de montage des partitions. En particulier il permet de monter les partitions automatiquement lors du démarrage du système. Pour plus de détails voir cette <a href="https://wiki.archlinux.org/title/Fstab_(Fran%C3%A7ais)">documentation</a>.<br>
+  On a tout d'abord besoin de récupérer l'UUID de chaque partition/système de fichiers avec la commande <code>blkid</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">blkid</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">/dev/sda1: UUID="38354553-56cf-4cb4-84b1-43867797823c" TYPE="ext4" PARTUUID="2a17447c-01"
+/dev/sdb4: UUID="7359f737-97cd-446d-aa11-2027f8ddddb7" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="Linux /var" PARTUUID="47acf981-b180-4418-a657-7d7a22ee721d"
+/dev/sdb2: UUID="1895cdb3-0e04-4513-a2ef-7f0acf5e70c9" BLOCK_SIZE="1024" TYPE="ext4" PARTLABEL="Freedesktop $BOOT" PARTUUID="cced450d-03d1-4c74-b7d0-d70ef910be0f"
+/dev/sdb9: UUID="abccbd45-60d3-4e2c-9e8b-e44112942b47" TYPE="swap" PARTLABEL="Linux swap" PARTUUID="9dc3b8ff-b489-46e1-adfa-ddbb6fda1c36"
+/dev/sdb10: PARTLABEL="Linux LUKS" PARTUUID="57ce7b37-9dcd-48eb-8f95-270bf17bff18"
+/dev/sdb7: UUID="1c522c5c-b529-473c-8d1a-d476c2c6b502" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="Linux filesystem" PARTUUID="6bbb2cdc-8d73-4c28-a2a0-e0881bcfd153"
+/dev/sdb5: UUID="8831c415-a522-41aa-82f4-3392e3713a67" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="Linux filesystem" PARTUUID="c64ccf3d-6e23-4a39-8132-add76896c838"
+/dev/sdb3: UUID="21ba4c8c-52b2-4c8e-a190-b66549b8206d" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="Linux x86-64 root (/)" PARTUUID="4672e4d7-b09d-457b-bf56-f484666d278c"
+/dev/sdb1: UUID="DB2C-CFF5" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="BIOS boot partition" PARTUUID="b9fe315d-86ed-437d-b60b-e8732890a800"
+/dev/sdb8: UUID="3af956c0-f9c2-41dc-b5e0-a76c38f3a716" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="Linux /home" PARTUUID="4d2bf748-a340-4271-b56f-62e80a6b9a79"
+/dev/sdb6: UUID="2cb04ca0-3382-44cf-bc57-505603d99bd0" BLOCK_SIZE="4096" TYPE="ext4" PARTLABEL="Linux filesystem" PARTUUID="f88d73f5-0ddb-4fe8-bbca-1af67aaec666"</code></pre>
+<p>
+  Puis on édite le fichier <code>/etc/fstab</code> en conséquence et en suivant la table de partition proposée à <a href="#partitioning">l'étape 2</a>. Le fichier est constitué de 6 colonnes :
+</p>
+<ul>
+  <li>La première désigne le système de fichier que l'on souhaite monter. On décide ici de le désigner par son <code>UUID</code>. On aurait aussi pu lors de la création des systèmes de fichiers indiquer une étiquette à chacun pour simplifier leur désignation en utilisant son <code>LABEL</code> à la place de son <code>UUID</code>.</li>
+  <li>La deuxième colonne correspond au point de montage.</li>
+  <li>La troisième au type de système de fichiers.</li>
+  <li>La quatrième colonne indique les options de montage. On utilisera ici essentiellement les options <code>noauto</code> pour ne pas monter automatique au démarrage du système, <code>nodev</code> pour ignorer les fichiers spéciaux caractère ou bloc, <code>noexec</code> pour ne pas autoriser l’exécution directe de fichiers binaires et <code>nosuid</code> pour ne pas tenir compte des bits Set-UID et Set-GID. Se référer au <a href="https://manpages.debian.org/testing/manpages-fr/mount.8.fr.html#OPTIONS_DE_MONTAGE_IND%C3%89PENDANTES">manuel</a> pour voir toutes les options et à ce <a href="https://wiki.gentoo.org/wiki/Security_Handbook/Mounting_partitions">guide</a> en plus de <a href="https://www.ssi.gouv.fr/guide/recommandations-de-securite-relatives-a-un-systeme-gnulinux/">[ANSSI R28]</a>.</li>
+  <li>La cinquième colonne sert à l'utilitaire <code>dump</code> qui ne sera pas utilisé ici donc il vaudra <code>0</code>.</li>
+  <li>La sixième colonne définit l'ordre de vérification du système de fichiers au démarrage par l'utilitaire <code>fsck</code>. Il y a trois valeurs possible : <code>0</code> pour ignorer la vérification, <code>1</code> la prioriété la plus haute (à réserver à <code>/</code>) et <code>2</code> pour les autres systèmes à vérifier.</li>
+</ul>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">nano /etc/fstab</code></pre>
+
+<figure><figcaption>/etc/fstab</figcaption>
+<pre class="line-numbers"><code class="language-log">UUID=1895cdb3-0e04-4513-a2ef-7f0acf5e70c9        /boot        ext4    noauto,nosuid,nodev,noexec               0    2
+UUID=21ba4c8c-52b2-4c8e-a190-b66549b8206d        /            ext4    errors=remount-ro                        0    1
+UUID=7359f737-97cd-446d-aa11-2027f8ddddb7        /var         ext4    nosuid,nodev,noexec                      0    2
+UUID=8831c415-a522-41aa-82f4-3392e3713a67        /var/log     ext4    nosuid,nodev,noexec                      0    2
+UUID=2cb04ca0-3382-44cf-bc57-505603d99bd0        /usr         ext4    nodev                                    0    2
+UUID=1c522c5c-b529-473c-8d1a-d476c2c6b502        /opt         ext4    nosuid,nodev                             0    2
+UUID=3af956c0-f9c2-41dc-b5e0-a76c38f3a716        /home        ext4    nosuid,nodev,noexec                      0    2
+tmpfs                                            /tmp         tmpfs   nosuid,nodev,noexec                      0    0
+UUID=abccbd45-60d3-4e2c-9e8b-e44112942b47        none         swap    sw                                       0    0</code></pre></figure>
+
+<p>
+  On configurera la dernière partition (la partition chiffrée) après.
+</p>
+
+<h2 id="init">Étape 8 : Installation du système d'initialisation : Systemd</h2>
+
+<p>
+  <a href="https://wiki.archlinux.org/title/Systemd_(Fran%C3%A7ais)">Systemd</a> est une suite logicielle qui fournit un système d'initialisation et un gestionnaire de services (ou daemons). C'est le premier processus démarré après le chargement du noyau et il a pour but de démarrer et d’arrêter tous les services. Systemd a été source de grandes polémiques mais a finalement été adopté par la plupart des distributions Linux. Debian utilise Systemd comme système d'initialisation par défaut depuis 2015.<br>
+  Pour installer systemd on va installer les paquets <code>systemd</code> et <code>dbus</code>. D-Bus est un logiciel de communication inter-processus permettant à des applications de communiquer entre elles. C'est une dépendance recommandée par systemd.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install systemd dbus</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Suggested packages:
+  default-dbus-session-bus | dbus-session-bus systemd-container systemd-homed systemd-userdbd systemd-boot systemd-resolved libfido2-1 libqrencode4 libtss2-esys-3.0.2-0 libtss2-mu0 libtss2-rc0 polkitd
+  | policykit-1
+Recommended packages:
+  systemd-timesyncd | time-daemon
+The following NEW packages will be installed:
+  dbus dbus-bin dbus-daemon dbus-session-bus-common dbus-system-bus-common dmsetup libapparmor1 libargon2-1 libcryptsetup12 libdbus-1-3 libdevmapper1.02.1 libexpat1 libfdisk1 libip4tc2 libjson-c5 libkmod2
+  libsystemd-shared systemd</code></pre>
+
+<h2 id="network">Étape 9 : Configuration du réseau</h2>
+
+<p>
+  On va configurer le réseau pour que le serveur puisse être connecté à Internet.<br>
+  Tout d'abord on installe le paquet <code>ifupdown</code> fournissant les outils <code>ifup</code> et <code>ifdown</code> utilisés pour configurer les interfaces réseau via le fichier <code>/etc/network/interfaces</code>. On installe également <code>iproute2</code> qui est une dépendance de <code>ifupdown</code> et qui fournit un ensemble d’utilitaires pour contrôler le trafic réseau.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install ifupdown iproute2</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Suggested packages:
+  ppp rdnssd iproute2-doc python3:any krb5-doc krb5-user
+Recommended packages:
+  isc-dhcp-client | dhcp-client libatm1 libpam-cap krb5-locales
+The following NEW packages will be installed:
+  ifupdown iproute2 libbpf1 libbsd0 libcap2-bin libelf1 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libmnl0 libtirpc-common libtirpc3 libxtables12</code></pre>
+
+<p>
+  Il faut ensuite déterminer le nom de l’interface réseau. On peut trouver cette information dans le fichier <code>/proc/net/dev</code> ou en utilisant <code>iproute2</code> avec la commande suivante.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">ip link show</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 58:cd:58:13:08:34 brd ff:ff:ff:ff:ff:ff
+    altname enp0s18
+    altname ens18</code></pre>
+
+<p>
+  L'interface loopback (<code>lo</code>) sera toujours présente. Ici le nom de l’interface réseau qui nous intéresse est <code>eth0</code>. Cependant on va choisir de prendre le nom alternatif (<code>altname</code>) <code>ens18</code> qui suit la nouvelle <a href="https://www.linuxtricks.fr/wiki/nomenclature-des-interfaces-reseau-sous-linux-enp0s3-wlo1">nomenclature des interfaces réseau sous Linux</a>. On créer alors le fichier de configuration <code>/etc/network/interfaces</code> avec l'IP du serveur. On rappelle qu'ici nous faisons le choix de ne pas configurer l'IPV6 (mais la configuration serait identique).
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">nano /etc/network/interfaces</code></pre>
+
+<figure><figcaption>/etc/network/interfaces</figcaption>
+  <pre class="line-numbers"><code class="language-log">auto lo
+iface lo inet loopback
+
+auto ens18
+iface ens18 inet static
+    address 10.11.12.13/32
+    gateway 10.11.12.1</code></pre></figure>
+
+<p>
+  Il faut remplacer <code>eth0</code> par le nom de votre interface réseau, <code>10.11.12.13</code> par l'adresse IP de votre serveur et <code>10.11.12.1</code> par l'adresse IP de la passerelle par défaut du réseau de votre serveur.<br>
+  On peut ensuite choisir le <a href="https://wiki.archlinux.org/title/Network_configuration#Set_the_hostname">nom d'hôte</a> de notre serveur en éditant le fichier <code>/etc/hostname</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">nano /etc/hostname</code></pre>
+
+<figure><figcaption>/etc/hostname</figcaption>
+<pre class="line-numbers"><code class="language-log">webalice</code></pre></figure>
+
+<p>
+  On édite enfin le fichier <code>/etc/hosts</code> permettant d'associer des adresse IP à des noms d'hôte sans passer par une résolution DNS. Voir le <a href="https://man.cx/hosts(5)/fr">manuel</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">nano /etc/hosts</code></pre>
+
+<figure><figcaption>/etc/hosts</figcaption>
+<pre class="line-numbers"><code class="language-log">127.0.0.1       localhost
+127.0.1.1       webalice</code></pre></figure>
+
+<h2 id="kernel">Étape 10 : Installation du noyau et du chargeur d'amorçage</h2>
+
+<p>
+  On installe la dernière version du <a href="https://www.redhat.com/fr/topics/linux/what-is-the-linux-kernel">noyau Linux</a> gérée par Debian avec le paquet <code>linux-image-amd64</code>. On installe aussi le paquet <code>zstd</code> qui permettra de compresser l'image <code>initramfs</code> plus efficacement que <code>gzip</code>. Plus d'information <a href="https://wiki.debian.org/fr/Initrd">ici</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install linux-image-amd64 zstd</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Suggested packages:
+  libarchive-dev bash-completion linux-doc-6.1 debian-kernel-handbook grub-pc | grub-efi-amd64 | extlinux
+Recommended packages:
+  busybox | busybox-static firmware-linux-free apparmor
+The following NEW packages will be installed:
+  cpio initramfs-tools initramfs-tools-core klibc-utils kmod libklibc linux-base linux-image-6.1.0-10-amd64 linux-image-amd64 udev zstd</code></pre>
+
+<p>
+  Il nous faut maintenant un chargeur d'amorçage pour lancer Debian au démarrage du serveur. Nous allons utiliser ici GRUB 2 en mode <code>BIOS</code> et non <code>UEFI</code>. Pour cela nous installons le paquet <code>grub-pc</code>. Pour plus d'informations voir <a href="https://wiki.archlinux.org/title/GRUB">ici</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install grub-pc</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">Suggested packages:
+  multiboot-doc grub-emu mtools xorriso desktop-base console-setup fuse
+Recommended packages:
+  os-prober
+The following NEW packages will be installed:
+  gettext-base grub-common grub-pc grub-pc-bin grub2-common libbrotli1 libefiboot1 libefivar1 libfreetype6 libfuse2 libpng16-16 sensible-utils ucf</code></pre>
+
+<p>
+  On configure alors GRUB en éditant le fichier <code>/etc/default/grub</code>. Pour voir toutes les options on peut se référer au <a href="https://www.gnu.org/software/grub/manual/grub/html_node/Simple-configuration.html">manuel</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">nano /etc/default/grub</code></pre>
+
+<figure><figcaption>/etc/hosts</figcaption>
+<pre class="line-numbers"><code class="language-log">GRUB_DEFAULT=0
+GRUB_TIMEOUT=0
+GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+GRUB_CMDLINE_LINUX=""</code></pre></figure>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">grub-install /dev/sdb
+update-grub</code></pre>
+
+<h2 id="ssh">Étape 11 : Installation de SSH</h2>
+
+<p>
+  Dans cette dernière étape d'installation du serveur : on change le mot de passe de <code>root</code> puis on installe et configure SSH pour pouvoir se connecter directement au serveur (sans passer par le mode rescue). De manière (très) temporaire on accepte de se connecter à root via mot de passe.<br>
+  On change le mot de passe de <code>root</code> avec la commande <code>passwd</code>. Il faudra alors choisir un mot de passe temporaire (c'est normal qu'aucun caractère ne s'affiche lors de la saisie du mot de passe) en prenant une longue chaîne de caractères qu'on pourra garder dans un bloc-note et qu'on utilisera juste lors de la première connexion au serveur.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">passwd</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">New password:
+Retype new password:
+passwd: password updated successfully</code></pre>
+
+<p>
+  On installe ensuite le serveur OpenSSH.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">apt install openssh-server libpam-systemd</code></pre>
+
+<pre class="command-line" data-user="root" data-host="rescue" data-output="1-100"><code class="language-bash">Suggested packages:
+  keychain libpam-ssh monkeysphere ssh-askpass molly-guard ufw
+Recommended packages:
+  dbus-user-session xauth ncurses-term psmisc libnss-systemd
+The following NEW packages will be installed:
+  libcbor0.8 libedit2 libfido2-1 libnsl2 libpam-systemd libproc2-0 libwrap0 openssh-client openssh-server openssh-sftp-server procps runit-helper systemd-sysv</code></pre>
+
+<p>
+  Pour que l'on puisse se connecter au compte root du serveur via SSH, il faut ajouter <code>PermitRootLogin yes</code> au début du fichier <code>/etc/ssh/sshd_config</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">nano /etc/ssh/sshd_config</code></pre>
+
+
+<figure><figcaption>/etc/ssh/sshd_config</figcaption>
+<pre class="line-numbers"><code class="language-log">PermitRootLogin yes
+# This is the sshd server system-wide configuration file.  See
+# sshd_config(5) for more information.
+# [...]</code></pre></figure>
+
+<h2 id="cleanup">Étape 12 : Nettoyage et redémarrage</h2>
+
+<p>
+  On termine en enlevant le script <code>/usr/sbin/policy-rc.d</code> et en démontant tout ce qui a été monté pour l'installation.
+</p>
+
+<pre class="command-line" data-user="root" data-host="rescue"><code class="language-bash">rm -f /usr/sbin/policy-rc.d
+exit
+umount -R /mnt
+exit</code></pre>
+
+<p>
+  Voilà, le système est installé. Il faut maintenant quitter le mode rescue et démarrer le serveur normalement via le panel de l'hébergeur. Le serveur est alors accessible via SSH en se connectant au compte root.
+</p>
+
+<h2 id="appendix">Appendice</h2>
+
+<h3 id="hardware">Connaître son serveur</h3>
+
+<p>
+  Cette partie facultative a pour but de mieux connaître (ou de vérifier) le matériel de son serveur/VPS. Pour cela on utilise le logiciel <code>inxi</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">apt install inxi
+inxi -F -v 7</code></pre>
+
+<pre class="command-line" data-output="1-100"><code class="language-bash">System:
+  Host: alice-server Kernel: 6.1.0-10-amd64 arch: x86_64 bits: 64 compiler: gcc v: 12.2.0
+    Console: pty pts/0 Distro: Debian GNU/Linux 12 (bookworm)
+Machine:
+  Type: Kvm System: QEMU product: Standard PC (i440FX + PIIX, 1996) v: pc-i440fx-7.1 serial: N/A
+    Chassis: type: 1 v: pc-i440fx-7.1 serial: N/A
+  Mobo: N/A model: N/A serial: N/A BIOS: SeaBIOS v: rel-1.16.0-0-gd239552ce722-prebuilt.qemu.org
+    date: 04/01/2014
+Battery:
+  Message: No system battery data found. Is one present?
+Memory:
+  RAM: total: 4.01 GiB used: 369.1 MiB (9.0%)
+  Array-1: capacity: 4.20 GiB slots: 1 EC: Multi-bit ECC max-module-size: 4.20 GiB note: est.
+  Device-1: DIMM 0 type: RAM detail: N/A size: 4.20 GiB speed: N/A volts: N/A width: N/A
+    manufacturer: QEMU part-no: N/A serial: N/A
+CPU:
+  Info: quad core model: Intel Xeon E5-2680 v4 bits: 64 type: MCP smt: <unsupported>
+    arch: Broadwell rev: 1 cache: L1: 256 KiB L2: 16 MiB L3: 16 MiB
+  Speed (MHz): avg: 2397 min/max: N/A cores: 1: 2397 2: 2397 3: 2397 4: 2397 bogomips: 19177
+  Flags: 3dnowprefetch abm adx aes apic arat arch_capabilities arch_perfmon avx avx2 bmi1 bmi2
+    clflush cmov constant_tsc cpuid cpuid_fault cx16 cx8 de ept ept_ad erms f16c flexpriority fma
+    fpu fsgsbase fxsr hle ht hypervisor ibpb ibrs invpcid invpcid_single lahf_lm lm mca mce
+    md_clear mmx movbe msr mtrr nopl nx pae pat pcid pclmulqdq pdcm pdpe1gb pge pni popcnt pse
+    pse36 pti rdrand rdseed rdtscp rep_good rtm sep smap smep ss ssbd sse sse2 sse4_1 sse4_2
+    ssse3 stibp syscall tpr_shadow tsc tsc_adjust tsc_deadline_timer tsc_known_freq umip vme vmx
+    vnmi vpid x2apic xsave xsaveopt xtopology
+Graphics:
+  Device-1: vendor: Red Hat driver: bochs-drm v: N/A ports: active: Virtual-1 empty: none
+    bus-ID: 00:02.0 chip-ID: 1234:1111 class-ID: 0300
+  Display: server: No display server data found. Headless machine? tty: 211x53
+  Monitor-1: Virtual-1 model: QEMU Monitor res: 1280x800 dpi: 100 size: 325x203mm (12.8x7.99")
+    diag: 383mm (15.1") modes: max: 1280x800 min: 640x480
+  API: OpenGL Message: GL data unavailable in console for root.
+Audio:
+  Message: No device data found.
+Network:
+  Device-1: Intel 82371AB/EB/MB PIIX4 ACPI vendor: Red Hat Qemu virtual machine
+    type: network bridge driver: piix4_smbus v: N/A port: N/A bus-ID: 00:01.3 chip-ID: 8086:7113
+    class-ID: 0680
+  Device-2: Red Hat Virtio network driver: virtio-pci v: 1 port: e0e0 bus-ID: 00:12.0
+    chip-ID: 1af4:1000 class-ID: 0200
+  IF: eth0 state: up speed: -1 duplex: unknown mac: 58:cd:58:13:08:34
+  IP v4: 10.11.12.13/24 scope: global broadcast: 10.11.12.255
+  IP v6: 8d75:1928:8f6a:3fd3:9370:2d0e:0e73:5af5/64 scope: global
+  IP v6: fe80::8e87:8b82:6dfc:cf8f/64 scope: link
+  WAN IP: 10.11.12.13
+Bluetooth:
+  Message: No bluetooth data found.
+Logical:
+  Message: No logical block device data found.
+RAID:
+  Message: No RAID data found.
+Drives:
+  Local Storage: total: 500 GiB used: 1.88 GiB (0.4%)
+  ID-1: /dev/sda vendor: QEMU model: HARDDISK size: 500 GiB speed: <unknown> type: N/A
+    serial: drive-scsi0 rev: 2.5+ scheme: GPT
+  Optical-1: /dev/sr0 vendor: QEMU model: QEMU DVD-ROM rev: 2.5+ dev-links: cdrom
+  Features: speed: 4 multisession: yes audio: yes dvd: yes rw: none state: running
+  Optical-2: /dev/sr1 vendor: QEMU model: QEMU DVD-ROM rev: 2.5+ dev-links: N/A
+  Features: speed: 4 multisession: yes audio: yes dvd: yes rw: none state: running
+Partition:
+  ID-1: / size: 491.99 GiB used: 1.87 GiB (0.4%) fs: ext4 dev: /dev/sda1 label: N/A
+    uuid: ef689fa2-177b-44b6-a81e-b59fb9446d59
+  ID-2: /boot/efi size: 123.7 MiB used: 11.5 MiB (9.3%) fs: vfat dev: /dev/sda15 label: N/A
+    uuid: CBDA-3128
+Swap:
+  Alert: No swap data was found.
+Unmounted:
+  ID-1: /dev/sda14 size: 3 MiB fs: N/A label: N/A uuid: N/A
+USB:
+  Hub-1: 1-0:1 info: Full speed or root hub ports: 2 rev: 1.1 speed: 12 Mb/s chip-ID: 1d6b:0001
+    class-ID: 0900
+  Device-1: 1-1:2 info: Adomax QEMU USB Tablet type: HID driver: hid-generic,usbhid
+    interfaces: 1 rev: 2.0 speed: 12 Mb/s power: 100mA chip-ID: 0627:0001 class-ID: 0300
+    serial: 28754-0000:00:01.2-1
+Sensors:
+  Src: lm-sensors+/sys Message: No sensor data found using /sys/class/hwmon or lm-sensors.
+Info:
+  Processes: 110 Uptime: 5m wakeups: 1 Init: systemd v: 252 target: graphical (5)
+  default: graphical Compilers: N/A Packages: pm: dpkg pkgs: 412 Shell: Bash v: 5.2.15
+  running-in: pty pts/0 (SSH) inxi: 3.3.26</code></pre>
+
+<p>
+  On pourra vérifier que le matériel correspond bien à celui proposé par l’hébergeur. On pourra aussi vérifier la réputation de l'adresse IP en particulier si l'IP n'est pas blacklisté par certain service.
+</p>
+
+<h3 id="benchmark">Tester la performance de son serveur</h3>
+
+<p>
+  Cette partie facultative a pour but de tester la performance (faire un benchmark) du serveur. On pourra ensuite comparer les résultats entre plusieurs serveurs. Pour cela on utilisera essentiellement le logiciel <code>sysbench</code>. Pour cela il faut d'abord l'installer.
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">apt install sysbench</code></pre>
+
+<h4 id="cpubench">Tester le processeur (CPU)</h4>
+
+<p>
+  On commence par tester le processeur. Pour chaque résultat on prendra soin de relevé le nombre d'opération par second (<code>events per second</code>).
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">sysbench cpu --cpu-max-prime=20000 --threads=1 run
+sysbench cpu --cpu-max-prime=20000 --threads=2 run
+sysbench cpu --cpu-max-prime=20000 --threads=4 run
+sysbench cpu --cpu-max-prime=20000 --threads=16 run</code></pre>
+
+<h4 id="rambench">Tester la mémoire vive (RAM)</h4>
+
+<p>
+  On teste ensuite la mémoire vive. Nous ferons trois tests :
+</p>
+
+<p>
+  Le premier test concerne la vitesse de transfert en écriture dans la RAM. On utilisera des blocs de 1 MiB. Pour cela on utilise la commande :
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">sysbench memory --memory-block-size=1M --memory-total-size=100G --threads=1 run</code></pre>
+<p>
+  Il faudra relever la quantité de données transférée par seconde (en MiB/sec).
+</p>
+
+<p>
+  Le deuxième test concerne la fréquence (c'est-à-dire le nombre d'opérations par seconde) en écriture dans la RAM. On utilisera des blocs de 1 KiB. Pour cela on utilise la commande :
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">sysbench memory --memory-block-size=1K --memory-total-size=100G --threads=1 run</code></pre>
+<p>
+  Il faudra relever le nombre d'opérations par seconde (le nombre entre parenthèse après <code>Total operations:</code>).
+</p>
+
+<p>
+  Le troisième test concerne les performances en lecture aléatoire sur des blocs de 1 KiB. Pour cela on utilise la commande :
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">sysbench memory --memory-block-size=1K --memory-total-size=100G --threads=1 --memory-access-mode=rnd --memory-oper=read run</code></pre>
+
+<p>
+  On relèvera ici à la fois la quantité de données transférée par seconde (en MiB/sec) et le nombre d'opérations par seconde.
+</p>
+
+<h4 id="hddbench">Tester le disque (HDD ou SSD)</h4>
+
+<p>
+  On teste ensuite le disque. Il faudra relever les deux valeurs dans la section <code>Throughput</code> (en <code>MiB/s</code>).
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">sysbench fileio --threads=1 --file-block-size=16K --file-total-size=32G --file-test-mode=rndrw prepare
+sysbench fileio --threads=1 --file-block-size=16K --file-total-size=32G --file-test-mode=rndrw run
+sysbench fileio --threads=1 --file-block-size=16K --file-total-size=32G --file-test-mode=rndrw cleanup</code></pre>
+
+<h4 id="netbench">Tester la connection internet</h4>
+
+<p>
+  On utilisera le test de débit <code>speedtest-cli</code> de <a href="https://www.speedtest.net">speedtest.net</a>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">apt install speedtest-cli
+speedtest-cli</code></pre>
+
+<h4 id="cryptobench">Tester la performance du chiffrement</h4>
+
+<p>
+  Pour terminer on regarde les performances du serveur sur différents algo de chiffrement. On utilise pour cela <code>cryptsetup</code> et <code>openssl</code>.
+</p>
+
+<pre class="command-line" data-user="root" data-host="home"><code class="language-bash">apt install cryptsetup openssl
+cryptsetup benchmark
+openssl speed ecdsap256 rsa2048</code></pre>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <hr>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-12 col-md-10 mx-auto">
+          <p class="navibar left"><a href="intro.html">&#11164; Introduction</a></p>
+          <p class="navibar right"><a href="sys_config.html">Configuration des outils de base de Debian &#11166;</a></p>
+          <p class="navibar center"><a href="contents.html">Sommaire</a></p>
+          <p class="copyright text-muted">Ce document est sous licence <a href="https://creativecommons.org/licenses/by-nc/4.0/legalcode.fr">CC BY-NC 4.0</a> &nbsp; <a href="https://github.com/Mezalor/DebianServer"><img alt="GitHub" src="github.png"></a></p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>
