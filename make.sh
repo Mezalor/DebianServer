@@ -6,7 +6,6 @@ mkdir -p docs
 cp bootstrap.min.css clean-blog.min.css debian.avif fav.png github.png prism.css prism.js style.css docs/
 
 cat header.html intro.html footer.html > docs/intro.html
-ln -s docs/intro.html docs/index.html
 cat header.html bios_install.html footer.html > docs/bios_install.html
 cat header.html uefi_install.html footer.html > docs/uefi_install.html
 cat header.html sys_config.html footer.html > docs/sys_config.html
@@ -31,3 +30,6 @@ sed -i 's/PAGESUIVANTE/ /g' docs/web-server.html
 
 sed -i 's/PAGEPRECEDENTE/<a href="intro.html">\&#11164; Introduction<\/a>/g' docs/contents.html
 sed -i 's/PAGESUIVANTE/<a href="bios_install.html">Installation de Debian (BIOS) \&#11166;<\/a><br><a href="uefi_install.html">Installation de Debian (UEFI) \&#11166;<\/a>/g' docs/contents.html
+
+cd docs
+ln -s intro.html index.html
